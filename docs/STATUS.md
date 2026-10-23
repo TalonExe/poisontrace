@@ -58,4 +58,4 @@ Next: add the minimal dashboard for inspecting runs, traces, and benchmark metri
 
 ## Handoff rule
 
-At the start of a new session, read `AGENTS.md` and `STATUS.md`, then run the test suite before changing code. Update this file after each completed slice.
+At the start of a new session, read `AGENTS.md` and `docs/STATUS.md`, then run the test suite before changing code. Update this file after each completed slice.
