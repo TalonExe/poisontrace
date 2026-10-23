@@ -1,0 +1,7 @@
+schema_version: 1
+scenario_id: authentication-alert-001
+alert: Multiple failed logins followed by a successful login from an unusual location.
+expected_recommendation: escalate
+tools:
+  - name: get_authentication_alert
+    description: Retrieve the authentication alert.

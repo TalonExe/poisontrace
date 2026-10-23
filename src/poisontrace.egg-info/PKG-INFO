@@ -1,0 +1,10 @@
+Metadata-Version: 2.4
+Name: poisontrace
+Version: 0.1.0
+Summary: Sandboxed evaluation of MCP tool-poisoning attacks against SOC agents
+Requires-Python: >=3.11
+Provides-Extra: dev
+Requires-Dist: pytest<9.0,>=8.0; extra == "dev"
+Requires-Dist: PyYAML<7.0,>=6.0; extra == "dev"
+Requires-Dist: openai<2.0,>=1.0; extra == "dev"
+Requires-Dist: google-genai<2.0,>=1.0; extra == "dev"
