@@ -60,6 +60,7 @@ The first domain, policy, scenario-loading, command-line execution, mode-selecti
 - Validated credential references before provider execution. Runs now reject missing references and provider mismatches before retrieving a secret.
 - Added direct Gemini adapter seam coverage for structured decisions, model and API-key forwarding, malformed or incomplete responses, and secret non-retention. Invalid model output now raises a stable `ValueError`, and the CLI does not print raw model responses.
 - Added CLI protected-action coverage. The `run` command recognizes synthetic high-impact tools and accepts `--approval-actor`; protected actions are blocked without approval and allowed with an approval actor.
+- Added Playwright browser smoke coverage for demo login, session creation and provider selection, sidebar navigation, and masked credential references. The browser suite uses the built frontend preview and never enters a real API key.
 
 ## Verification
 
@@ -86,7 +87,7 @@ Run the suite with:
 
 ## Next slice
 
-Next: add browser-level coverage for the login, session workspace, provider selection, sidebar navigation, and credential selector.
+Next: wire the managed secret-store adapter to an application-specific client, then address concurrent SQLite event association.
 
 ## Backlog ticket
 
@@ -106,7 +107,6 @@ Status: implemented in `scripts/launch.py`. See `docs/LAUNCH.md`.
 
 ## Known gaps against the completed list
 
-- Browser-level frontend coverage is still pending for rendered login, session workspace, provider selection, sidebar navigation, and the credential selector.
 - The dashboard adapter requires the `/api/runs` backend and displays an explicit unavailable/empty state when it cannot load runs.
 - The managed secret-store adapter still needs an application-specific client wiring layer.
 - SQLite event association currently assigns all unassigned events to the next saved result, which is unsafe for concurrent runs.
