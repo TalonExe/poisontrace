@@ -16,7 +16,9 @@ def python_executable(project_root: Path) -> Path:
 
 
 def npm_executable() -> str:
-    return "npm.cmd" if os.name == "nt" else "npm"
+    if os.name == "nt" and shutil.which("npm.cmd"):
+        return "npm.cmd"
+    return "npm"
 
 
 def validate_environment(project_root: Path, *, node_path: str | None = None, npm_path: str | None = None) -> list[str]:

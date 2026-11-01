@@ -17,6 +17,15 @@ def test_launcher_builds_backend_and_frontend_commands(tmp_path, monkeypatch):
     assert frontend[1:3] == ["run", "dev"]
 
 
+def test_launcher_accepts_npm_exe_on_windows_nvm_setups(monkeypatch):
+    monkeypatch.setattr("poisontrace.launcher.os.name", "nt")
+    monkeypatch.setattr(shutil, "which", lambda command: "npm.exe" if command == "npm" else None)
+
+    from poisontrace.launcher import npm_executable
+
+    assert npm_executable() == "npm"
+
+
 def test_launcher_reports_missing_runtime_requirements(tmp_path, monkeypatch):
     monkeypatch.delenv("POISONTRACE_SECRETS_KEY", raising=False)
     monkeypatch.setattr(shutil, "which", lambda _: None)
