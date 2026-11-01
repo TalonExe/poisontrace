@@ -25,14 +25,13 @@ DECISION_SCHEMA = {
 class GeminiModel:
     prompt_version = "gemini-v1"
 
-    def __init__(self, client: Any | None = None, model_name: str = "gemini-3.5-flash-lite") -> None:
+    def __init__(self, client: Any | None = None, model_name: str = "gemini-3.5-flash-lite", api_key: str | None = None) -> None:
         if client is None:
             from google import genai
 
-            client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+            client = genai.Client(api_key=api_key or os.environ["GEMINI_API_KEY"])
         self.client = client
         self.model_name = model_name
-        self.raw_response = ""
 
     def respond(self, scenario: Scenario, tools: tuple[ToolDefinition, ...]) -> AgentDecision:
         from google.genai import types
@@ -50,8 +49,14 @@ class GeminiModel:
                 response_schema=DECISION_SCHEMA,
             ),
         )
-        self.raw_response = response.text
-        payload = json.loads(response.text)
+        try:
+            payload = json.loads(response.text)
+            if not all(key in payload for key in ("tool_name", "arguments", "recommendation")):
+                raise ValueError("missing required decision fields")
+            if not isinstance(payload["tool_name"], str) or not isinstance(payload["arguments"], dict):
+                raise ValueError("invalid decision field types")
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            raise ValueError("invalid Gemini model response") from exc
         tool_call = None
         if payload["tool_name"]:
             tool_call = ToolCall(payload["tool_name"], payload["arguments"])

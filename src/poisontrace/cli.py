@@ -7,6 +7,7 @@ from poisontrace.domain import ExperimentMode
 from poisontrace.gateway import ToolGateway
 from poisontrace.metrics import calculate_metrics
 from poisontrace.gemini_model import GeminiModel
+from poisontrace.openai_model import OpenAIModel
 from poisontrace.runner import ScenarioRunner
 from poisontrace.scenario_loader import load_scenario
 from poisontrace.trace import InMemoryTraceStore
@@ -17,6 +18,8 @@ def _model_for(name: str):
         return FakeModel()
     if name == "gemini-3.5-flash-lite":
         return GeminiModel(model_name=name)
+    if name == "gpt-5-mini":
+        return OpenAIModel(model_name=name)
     raise ValueError(f"unsupported model: {name}")
 
 
@@ -26,12 +29,12 @@ def main(argv: list[str] | None = None) -> int:
     run_parser = subparsers.add_parser("run")
     run_parser.add_argument("scenario", type=Path)
     run_parser.add_argument("--mode", choices=[mode.value for mode in ExperimentMode], default="clean")
-    run_parser.add_argument("--model", choices=["fake", "gemini-3.5-flash-lite"], default="fake")
+    run_parser.add_argument("--model", choices=["fake", "gemini-3.5-flash-lite", "gpt-5-mini"], default="fake")
     benchmark_parser = subparsers.add_parser("benchmark")
     benchmark_parser.add_argument("scenario", type=Path)
     benchmark_parser.add_argument("--mode", choices=[mode.value for mode in ExperimentMode], default="clean")
     benchmark_parser.add_argument("--repeated-runs", type=int, default=3)
-    benchmark_parser.add_argument("--model", choices=["fake", "gemini-3.5-flash-lite"], default="fake")
+    benchmark_parser.add_argument("--model", choices=["fake", "gemini-3.5-flash-lite", "gpt-5-mini"], default="fake")
     args = parser.parse_args(argv)
 
     if args.command == "run":

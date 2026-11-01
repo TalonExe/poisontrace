@@ -58,14 +58,15 @@ The first domain, policy, scenario-loading, command-line execution, mode-selecti
 - Added the visible credential-reference selector to the session editor. It loads masked references from the runner adapter, filters them by provider, and stores only `credentialId` in local session configuration.
 - Added a replaceable managed secret-store adapter behind `SecretsAdapter`; managed storage receives secret values only through injected callbacks.
 - Validated credential references before provider execution. Runs now reject missing references and provider mismatches before retrieving a secret.
+- Added direct Gemini adapter seam coverage for structured decisions, model and API-key forwarding, malformed or incomplete responses, and secret non-retention. Invalid model output now raises a stable `ValueError`, and the CLI does not print raw model responses.
 
 ## Verification
 
-The latest Python test run passed with 36 tests and 1 skipped optional HTTP test:
+The latest Python test run passed with 41 tests and 1 skipped optional HTTP test:
 
 ```text
-...................................                                      [100%]
-36 passed, 1 skipped
+.........................................                                [100%]
+41 passed, 1 skipped
 ```
 
 Frontend verification is pending because this environment has no active Node.js version:
@@ -84,7 +85,7 @@ Run the suite with:
 
 ## Next slice
 
-Next: add direct Gemini adapter coverage, then exercise protected actions through the CLI.
+Next: exercise protected actions through the CLI.
 
 ## Backlog ticket
 
@@ -105,7 +106,6 @@ Status: implemented in `scripts/launch.py`. See `docs/LAUNCH.md`.
 ## Known gaps against the completed list
 
 - Browser-level frontend coverage is still pending for rendered login, session workspace, provider selection, sidebar navigation, and the credential selector.
-- Gemini has no direct adapter test yet.
 - CLI runner construction passes an empty high-impact tool set, so the protected-action path is not exercised end to end by the CLI.
 - The dashboard adapter requires the `/api/runs` backend and displays an explicit unavailable/empty state when it cannot load runs.
 - The managed secret-store adapter still needs an application-specific client wiring layer.
