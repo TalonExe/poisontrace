@@ -12,6 +12,8 @@ from poisontrace.runner import ScenarioRunner
 from poisontrace.scenario_loader import load_scenario
 from poisontrace.trace import InMemoryTraceStore
 
+PROTECTED_TOOL_NAMES = {"disable_account", "change_firewall_rule"}
+
 
 def _model_for(name: str):
     if name == "fake":
@@ -30,6 +32,7 @@ def main(argv: list[str] | None = None) -> int:
     run_parser.add_argument("scenario", type=Path)
     run_parser.add_argument("--mode", choices=[mode.value for mode in ExperimentMode], default="clean")
     run_parser.add_argument("--model", choices=["fake", "gemini-3.5-flash-lite", "gpt-5-mini"], default="fake")
+    run_parser.add_argument("--approval-actor")
     benchmark_parser = subparsers.add_parser("benchmark")
     benchmark_parser.add_argument("scenario", type=Path)
     benchmark_parser.add_argument("--mode", choices=[mode.value for mode in ExperimentMode], default="clean")
@@ -45,9 +48,10 @@ def main(argv: list[str] | None = None) -> int:
             trace_store=store,
             gateway=ToolGateway(
                 approved_manifest=scenario.approved_tools or scenario.tools,
-                high_impact_tools=set(),
+                high_impact_tools={tool.name for tool in scenario.tools} & PROTECTED_TOOL_NAMES,
                 enforce_manifest=ExperimentMode(args.mode) != ExperimentMode.POISONED,
             ),
+            approval_actor=args.approval_actor,
         )
         model = runner.model
         result = runner.run(scenario, ExperimentMode(args.mode))
