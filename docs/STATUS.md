@@ -57,14 +57,15 @@ The first domain, policy, scenario-loading, command-line execution, mode-selecti
 - Wired frontend sessions and runner requests to credential references. The adapter exposes credential lifecycle calls and never persists submitted secrets.
 - Added the visible credential-reference selector to the session editor. It loads masked references from the runner adapter, filters them by provider, and stores only `credentialId` in local session configuration.
 - Added a replaceable managed secret-store adapter behind `SecretsAdapter`; managed storage receives secret values only through injected callbacks.
+- Validated credential references before provider execution. Runs now reject missing references and provider mismatches before retrieving a secret.
 
 ## Verification
 
-The latest Python test run passed with 32 tests and 1 skipped optional HTTP test:
+The latest Python test run passed with 36 tests and 1 skipped optional HTTP test:
 
 ```text
-................................                                         [100%]
-32 passed, 1 skipped
+...................................                                      [100%]
+36 passed, 1 skipped
 ```
 
 Frontend verification is pending because this environment has no active Node.js version:
@@ -83,7 +84,7 @@ Run the suite with:
 
 ## Next slice
 
-Next: validate credential provider matches during execution, then add direct Gemini adapter coverage.
+Next: add direct Gemini adapter coverage, then exercise protected actions through the CLI.
 
 ## Backlog ticket
 
