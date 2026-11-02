@@ -75,3 +75,6 @@ class ExperimentResult:
     model_name: str = "unknown"
     prompt_version: str = "unknown"
     run_configuration: dict[str, str] = field(default_factory=dict)
+    injection_verdict: str = "Blocked"
+    task_outcome: str = "Failed"
+    tool_call_status: str = "Not requested"
