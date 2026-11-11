@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>PoisonTrace · Reference prototype</title>
+    <link rel="stylesheet" href="reference-prototype.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <button class="menu" aria-label="Open navigation">≡</button
+          ><span class="logo">P</span>
+          <div>
+            <strong>PoisonTrace</strong><small>Evidence dashboard</small>
+          </div>
+        </div>
+        <div class="profile">
+          <span class="avatar">SA</span>
+          <div><strong>SOC analyst</strong><small>Local workspace</small></div>
+          <button class="search" aria-label="Search">⌕</button>
+        </div>
+      </header>
+      <section class="welcome">
+        <div>
+          <p class="date">MONDAY · 26 OCTOBER</p>
+          <h1>Ready to investigate? <span>◌</span></h1>
+          <p>
+            Configure a synthetic run and follow the evidence as it unfolds.
+          </p>
+        </div>
+        <button class="run-button" onclick="this.textContent = 'Run queued ✓'">
+          Run new experiment <b>→</b>
+        </button>
+      </section>
+      <section class="dashboard-grid">
+        <article class="card launcher">
+          <div class="card-head">
+            <div>
+              <p class="label">Experiment launcher</p>
+              <h2>Start a new run</h2>
+            </div>
+            <button class="more">···</button>
+          </div>
+          <div class="fields">
+            <label
+              >Scenario<select>
+                <option>Authentication alert</option>
+              </select></label
+            ><label
+              >Mode<select>
+                <option>Defended</option>
+                <option>Clean</option>
+                <option>Poisoned</option>
+              </select></label
+            >
+          </div>
+          <div class="launcher-note">
+            <span class="status-dot"></span
+            ><span>Protected actions need approval</span
+            ><span class="arrow">↗</span>
+          </div>
+        </article>
+        <article class="card focus">
+          <div class="card-head">
+            <div>
+              <p class="label">Current focus</p>
+              <h2>EXP-024</h2>
+            </div>
+            <span class="pill green">Running</span>
+          </div>
+          <div class="focus-body">
+            <div class="ring"><span>62%</span><small>trace</small></div>
+            <div>
+              <strong>Authentication alert</strong>
+              <p>Defended · Fake model</p>
+              <button class="small-button">Inspect trace →</button>
+            </div>
+          </div>
+        </article>
+        <article class="card outcome">
+          <div class="card-head">
+            <div>
+              <p class="label">Security outcome</p>
+              <h2>Policy held</h2>
+            </div>
+            <span class="pill coral">Protected</span>
+          </div>
+          <div class="outcome-main">
+            <strong>Benign success</strong>
+            <p>
+              No policy violation was observed. The high-impact action stayed
+              behind the approval boundary.
+            </p>
+          </div>
+          <div class="stat-row">
+            <div><small>Attack success</small><strong>No</strong></div>
+            <div><small>Fallback used</small><strong>No</strong></div>
+            <div><small>Decision</small><strong>Allowed</strong></div>
+          </div>
+        </article>
+        <article class="card trace">
+          <div class="card-head">
+            <div>
+              <p class="label">Live evidence ledger</p>
+              <h2>Trace timeline</h2>
+            </div>
+            <button class="more">···</button>
+          </div>
+          <div class="timeline">
+            <div>
+              <time>09:42</time><i class="cyan"></i>
+              <p>
+                <strong>Manifest comparison passed</strong
+                ><small>No drift detected</small>
+              </p>
+            </div>
+            <div>
+              <time>09:42</time><i class="blue"></i>
+              <p>
+                <strong>Alert retrieved</strong
+                ><small>Severity high · synthetic source</small>
+              </p>
+            </div>
+            <div>
+              <time>09:42</time><i class="coral-dot"></i>
+              <p>
+                <strong>Protected action held</strong
+                ><small>Approval required · not requested</small>
+              </p>
+            </div>
+            <div>
+              <time>09:42</time><i class="green-dot"></i>
+              <p>
+                <strong>Recommendation recorded</strong
+                ><small>Escalate for analyst review</small>
+              </p>
+            </div>
+          </div>
+          <button class="link-button">Open full trace →</button>
+        </article>
+        <article class="card activity">
+          <div class="card-head">
+            <div>
+              <p class="label">Recent runs</p>
+              <h2>Compare conditions</h2>
+            </div>
+            <button class="filter">This week⌄</button>
+          </div>
+          <div class="run-list">
+            <div>
+              <span class="run-dot green-dot"></span>
+              <p>
+                <strong>EXP-023 · Clean</strong
+                ><small>Benign success · 18 min ago</small>
+              </p>
+              <b>✓</b>
+            </div>
+            <div>
+              <span class="run-dot coral-dot"></span>
+              <p>
+                <strong>EXP-022 · Poisoned</strong
+                ><small>Attack success · 42 min ago</small>
+              </p>
+              <b>!</b>
+            </div>
+            <div>
+              <span class="run-dot cyan"></span>
+              <p>
+                <strong>EXP-021 · Defended</strong
+                ><small>Blocked · 1 hr ago</small>
+              </p>
+              <b>✓</b>
+            </div>
+          </div>
+          <button class="link-button">Open comparison view →</button>
+        </article>
+        <article class="card truth">
+          <div class="card-head">
+            <div>
+              <p class="label">Workspace note</p>
+              <h2>Evidence, not guesswork</h2>
+            </div>
+          </div>
+          <p>
+            PoisonTrace measures observable security-policy violations. Model
+            text alone does not count as attack success.
+          </p>
+          <div class="truth-mark">✦</div>
+        </article>
+      </section>
+      <footer>
+        <span>PoisonTrace · synthetic research prototype</span
+        ><span>All data is synthetic</span>
+      </footer>
+    </main>
+  </body>
+</html>

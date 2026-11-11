@@ -3,7 +3,24 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "scripts": {"dev": "vite", "build": "vite build", "test": "node --test src/*.test.js", "test:e2e": "playwright test", "preview": "vite preview"},
-  "dependencies": {"@vitejs/plugin-react": "latest", "tailwindcss": "latest", "@tailwindcss/vite": "latest", "vite": "latest", "react": "latest", "react-dom": "latest"},
-  "devDependencies": {"@playwright/test": "^1.49.0"}
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "node --test src/tests/*.test.js",
+    "test:e2e": "playwright test",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "latest",
+    "@tanstack/react-router": "^1.170.46",
+    "@vitejs/plugin-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "tailwindcss": "latest",
+    "vite": "latest"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "prettier": "^3.9.10"
+  }
 }

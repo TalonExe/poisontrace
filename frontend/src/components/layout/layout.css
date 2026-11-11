@@ -1,0 +1,48 @@
+.authenticated-header {
+  height: 82px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #2a3542;
+}
+.authenticated-user {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.authenticated-user-copy strong,
+.authenticated-user-copy small {
+  display: block;
+}
+.authenticated-user-copy strong {
+  font-size: 11px;
+}
+.authenticated-user-copy small {
+  color: #8b9aaa;
+  font-size: 9px;
+  margin-top: 2px;
+}
+.sign-out-button {
+  margin-left: 8px;
+}
+.session-shell > .authenticated-header {
+  padding: 0 clamp(24px, 6vw, 96px);
+}
+.session-shell + .authenticated-header {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 252px;
+  padding: 0 clamp(24px, 6vw, 96px);
+  background: #11161d;
+  z-index: 15;
+}
+@media (max-width: 850px) {
+  .session-shell > .authenticated-header {
+    padding: 0 18px;
+  }
+  .session-shell + .authenticated-header {
+    left: 0;
+    padding: 0 18px;
+  }
+}

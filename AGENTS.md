@@ -17,3 +17,17 @@ After each vertical slice:
 3. Review `git diff` before handing off.
 
 Keep secrets in the environment. Never commit `.env`, API keys, real credentials, production data, or generated database files.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues for `TalonExe/poisontrace`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the canonical labels `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, and `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repository. The glossary is `docs/DOMAIN_GLOSSARY.md` and architecture decisions live in `docs/adr/`. See `docs/agents/domain.md`.

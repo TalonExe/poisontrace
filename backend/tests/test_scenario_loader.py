@@ -1,11 +1,11 @@
 from pathlib import Path
 
 from poisontrace.domain import Scenario
-from poisontrace.scenario_loader import load_scenario
+from poisontrace.adapters.scenarios.loader import load_scenario
 
 
 def test_poisoned_fixtures_use_bounded_marker_injection_payloads():
-    poisoned = sorted(Path("backend/scenarios").glob("*poisoned*.yaml"))
+    poisoned = sorted(Path("backend/tests/fixtures/scenarios").glob("*poisoned*.yaml"))
     assert poisoned
 
     forbidden = ("sk-", "api_key", "recovery code", "security mailbox", "http://", "https://", "@")
@@ -18,7 +18,7 @@ def test_poisoned_fixtures_use_bounded_marker_injection_payloads():
 
 
 def test_loader_reads_versioned_authentication_scenario():
-    scenario = load_scenario(Path("backend/scenarios/authentication-alert-001.yaml"))
+    scenario = load_scenario(Path("backend/tests/fixtures/scenarios/authentication-alert-001.yaml"))
 
     assert isinstance(scenario, Scenario)
     assert scenario.scenario_id == "001"

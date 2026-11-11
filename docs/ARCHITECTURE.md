@@ -1,52 +1,72 @@
-# PoisonTrace architecture
+# PoisonTrace backend architecture
 
-## External seams
+Current structure after compatibility retirement, 2026-11-03. This guide describes the source tree as it exists now. STATUS.md records verification and prior slices. ADRs 0001, 0002 and 0003 remain authoritative. Earlier architecture-guide versions are review artifacts in .scratch/backend-cleanup-docs-before.zip.
 
-### Scenario runner
+## Where code belongs
 
-`run(scenario_id, mode, model, run_count) -> ExperimentRun[]`
+The package is backend/src/poisontrace. It has 48 Python source files, including package initializers, down from 67 before compatibility retirement.
 
-The runner loads a scenario, coordinates the agent and tools, applies the selected policy, records the trace, and returns persisted run results. Callers do not need to know how MCP sessions, model calls, or SQLite writes are coordinated.
+| Location | Owns |
+| --- | --- |
+| domain/values.py | Scenario, tools, model decisions, experiment modes and results |
+| domain/rules.py | Injection marker and pure output redaction |
+| domain/metrics.py | Benchmark metric calculations |
+| application/runs.py | Run creation, history, detail and summaries |
+| application/campaigns.py | Campaign creation, execution, aggregation, child associations and reruns |
+| application/credentials.py | Credential operations, provider matching support and masked responses |
+| application/scenarios.py | Scenario CRUD, identity allocation and usable-scenario lookup |
+| application/accounts.py | Account/session use cases, hashing, lifecycle rules and transactional account interfaces |
+| application/execution.py | ScenarioRunner execution coordination and trace recording |
+| application/benchmark.py | Repeated-trial execution coordination |
+| application/gateway.py | ToolGateway manifest checks and protected-action approval |
+| application/ports.py | Application-owned model, scenario, trace/run, campaign and secret interfaces |
+| application/contracts.py | Request/response types used by the implementation |
+| application/errors.py | ScenarioNotFound, the explicit run lookup error |
+| adapters/models/ | Fake, OpenAI and Gemini implementations |
+| adapters/persistence/ | Trace, campaign and account records; in-memory stores; shared SQLite setup |
+| adapters/scenarios/ | YAML parsing, filesystem documents, atomic writes and campaign filename selection/reload |
+| adapters/secrets/storage.py | Encrypted SQLite and injected managed-secret implementations |
+| interfaces/http/ | HTTP translation, authentication/role checks and routers |
+| interfaces/cli.py | Benchmark CLI argument parsing and output |
+| config.py | Immutable paths, encryption-key validation and repr-redacted seed configuration |
+| bootstrap.py | Concrete dependency construction and explicit composition |
+| web.py, __main__.py | Thin HTTP and CLI entrypoints |
+| launcher.py | Local API/dashboard process launcher used by scripts/launch.py |
 
-### Agent model
+Package __init__.py files identify packages. domain/__init__.py also provides the intentional public domain-value interface. They do not eagerly import concrete providers or application startup.
 
-`respond(prompt, tool_definitions) -> AgentDecision`
+## How to enter the backend
 
-The agent model adapter receives a structured prompt and discovered tool definitions, then returns a structured decision. The fake model and the OpenAI adapter satisfy the same interface.
+- Use bootstrap.build_backend(WebConfig(...), secrets, model_factory=...) for explicit application composition. The model factory is injectable; omitted secret storage remains unavailable to credential use cases.
+- Use bootstrap.build_web_backend(config=..., managed_secret_client=...) for configured web startup. Local storage requires a valid encryption key; an injected managed client does not need a local key/database.
+- Use bootstrap.build_accounts(database, seeds=...) for account composition. Omitting seeds reads the existing environment configuration; explicit seeds support isolated tests.
+- Use bootstrap.create_app(backend) to compose HTTP with one shared authentication instance. No-argument construction remains provider-key optional. interfaces/http/app.py receives authentication explicitly and does not construct dependencies or call back into bootstrap.
+- Launch HTTP with uvicorn poisontrace.web:app. Launch benchmark commands with python -m poisontrace. scripts/launch.py starts the local API/dashboard processes.
 
-### Tool gateway
+Backend is a group of constructed dependencies, not another use-case facade. Call backend.runs, backend.campaign_service, backend.scenario_service or backend.credentials directly. backend.store, backend.campaigns and backend.scenarios are the concrete run, campaign and scenario stores supplied to those use cases.
 
-`invoke(tool_name, arguments, policy_context) -> ToolOutcome`
+## Interfaces and dependency direction
 
-The gateway owns tool lookup, manifest validation, least-privilege checks, approval requirements, invocation, and policy decisions. The runner does not call MCP tools directly.
+Domain modules depend only on the standard library and other domain modules. Metrics operate on completed experiment results without models, transport or storage. Application modules depend on domain values and application-owned interfaces, never concrete adapters, configuration, HTTP, CLI or bootstrap. Bootstrap supplies the concrete adapters. HTTP and CLI translate user inputs/results and invoke the application modules.
 
-### Trace store
+ScenarioRunner receives AgentModel, TraceStore and ToolGateway. ToolGateway remains the only tool invocation seam. Model responses, discoveries, decisions, blocked attempts, results and recommendations retain their ordered traces. BenchmarkRunner receives a runner factory; bootstrap creates fresh model/trace state for every trial and preserves the distinct single-run approval and benchmark high-impact policies.
 
-`record(event) -> None` and `save_run(result) -> RunId`
+ScenarioRepository hides YAML serialization and paths. ScenarioService owns identifier allocation, immutable update identity, draft creation fallback and the usable-scenario gate. Invalid files remain visible and repairable. CampaignScenarioFiles deliberately retains sorted poisoned-filename selection and reload, including the known invalid-file selection issue.
 
-The trace store accepts domain events and saves completed experiment results. The benchmark logic does not depend on SQLite-specific queries.
+AccountStore supplies transaction-scoped AccountRecords. Application accounts own normalization, scrypt hashing, token generation/hashing, active-account checks and last-active-superadmin restrictions. SQLite owns SQL and the existing commit/rollback scope. Seed usernames, missing-passcode skipping and INSERT OR IGNORE semantics are unchanged. Browser investigation configurations remain distinct from authentication sessions.
 
-### Metrics calculator
+Shared SQLite setup remains in adapters/persistence/support.py. Trace, campaign and account stores initialize the same schema. No schema or data migration accompanied this cleanup. Secret storage retains encryption, masks, revocation and managed-client behavior; managed reference metadata still resides in memory.
 
-`calculate(run_results, ground_truth) -> Metrics`
+## Compatibility retirement
 
-The calculator derives the initial benchmark metrics from completed run results and scenario ground truth. It has no model, MCP, or database dependency.
+There is now one canonical import path for each implementation. The old root agent, provider-model, trace, persistence, scenario, secrets, users, runner, gateway, benchmark, metrics and CLI modules are removed. web_adapter.py and RunWebAdapter are removed. bootstrap.build_adapter was replaced by build_web_backend, which returns Backend directly. The ScenarioStore alias is removed; use YamlScenarioRepository.
 
-## Internal adapters
+This intentionally retires the old Python imports, database-path UserSessionService constructor and forwarding methods. Repository consumers and behavioral tests use the canonical modules. HTTP routes, request/response behavior, CLI commands and storage formats are unchanged. External Python callers must migrate to the paths and factories above.
 
-- `FakeModelAdapter` for deterministic tests
-- `OpenAIModelAdapter` for `gpt-5-mini`
-- `McpToolAdapter` for sandboxed MCP servers
-- `SqliteTraceStore` for local persistence
-- `InMemoryTraceStore` for fast tests
+Unused placeholder errors, duplicate trace protocols and unconsumed scenario/campaign DTOs were removed. Actual TraceEvent and storage interfaces remain in application/ports.py. Tests of retired export identity were removed; behavior tests were migrated, and isolated import checks are consolidated in backend/tests/test_imports.py.
 
-## First vertical slice
+## Verification and remaining behavior work
 
-The first slice crosses the scenario runner, fake model, tool gateway, in-memory trace store, and metrics calculator. It proves clean, poisoned, and defended outcomes before introducing Docker, SQLite, FastAPI, or React.
+Run .venv/Scripts/python.exe -m pytest -q and .venv/Scripts/python.exe -m compileall -q backend/src backend/tests. Dependency checks live in test_architecture_boundaries.py; behavior tests exercise application, adapter and HTTP interfaces. The source/test pre-cleanup snapshot is .scratch/backend-cleanup-before.zip. It contains source review copies, not runtime input.
 
-## Design constraints
-
-- Domain contracts must not depend on FastAPI, SQLite, Docker, or an OpenAI SDK type.
-- The tool gateway is the only module allowed to execute a tool.
-- The trace is append-oriented and records blocked attempts as well as successful calls.
-- Model adapters return structured decisions rather than raw text so benchmark outcomes are testable.
+The reorganization does not fix latest_run_id correlation after execution, non-atomic campaign claims, campaign eligibility, request-bound execution without recovery or missing per-user credential/run/campaign/child-trace ownership. Public BYOK privacy, curated read-only scenarios, bounded sessions, runtime packaging and deployment prerequisites remain pending under ADR 0003. Keep those as separately tested behavior changes. Do not infer concurrency, live-provider, clean-install, full-e2e or deployment readiness from the structural checks.

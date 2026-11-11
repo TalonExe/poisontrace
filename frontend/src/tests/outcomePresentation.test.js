@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { outcomePresentation } from "../utils/outcomePresentation";
+import { outcomePresentation } from "../utils/outcomePresentation.js";
 
 test("presents injection, task, tool, and system outcomes independently", () => {
   assert.deepEqual(

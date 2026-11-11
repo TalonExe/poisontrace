@@ -11,7 +11,11 @@ dev = [
     "openai>=1.0,<2.0",
     "google-genai>=1.0,<2.0",
 ]
+web = [
+    "fastapi>=0.115,<1.0",
+    "uvicorn>=0.30,<1.0",
+]
 
 [tool.pytest.ini_options]
-testpaths = ["tests"]
-pythonpath = ["src"]
+testpaths = ["backend/tests"]
+pythonpath = ["backend/src"]

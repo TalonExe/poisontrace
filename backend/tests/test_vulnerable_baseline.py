@@ -1,8 +1,8 @@
-from poisontrace.agent import FakeModel
+from poisontrace.adapters.models.fake import FakeModel
 from poisontrace.domain import AgentDecision, ExperimentMode, Scenario, ToolCall, ToolDefinition
-from poisontrace.gateway import ToolGateway
-from poisontrace.runner import ScenarioRunner
-from poisontrace.trace import InMemoryTraceStore
+from poisontrace.application.gateway import ToolGateway
+from poisontrace.application.execution import ScenarioRunner
+from poisontrace.adapters.persistence.traces import InMemoryTraceStore
 
 
 class MarkerModel(FakeModel):

@@ -7,8 +7,9 @@ import { outcomePresentation } from "../../utils/outcomePresentation";
 
 const modelOptions = { gemini: "Gemini API LLM", openai: "OpenAI API LLM" };
 function CampaignHistory({ campaigns, error, runner, session, onRefresh, singleRunRunning }) {
-  const [expanded, setExpanded] = useState(null);
   const [details, setDetails] = useState({});
+  const [selectedCampaignId, setSelectedCampaignId] = useState(null);
+  const [selectedScenarioIndex, setSelectedScenarioIndex] = useState(null);
   const [rerunning, setRerunning] = useState("");
   const [campaignRunning, setCampaignRunning] = useState(false);
   const [campaignRunError, setCampaignRunError] = useState("");
@@ -16,9 +17,14 @@ function CampaignHistory({ campaigns, error, runner, session, onRefresh, singleR
     setCampaignRunning(true);
     setCampaignRunError("");
     try {
+      const model = session.model === "gemini"
+        ? "gemini-3.5-flash-lite"
+        : session.model === "openai"
+          ? "gpt-5-mini"
+          : "fake";
       await runner.runCampaign({
         provider: session.model,
-        model: session.model,
+        model,
         credentialId: session.credentialId,
       });
       await onRefresh();
@@ -28,9 +34,9 @@ function CampaignHistory({ campaigns, error, runner, session, onRefresh, singleR
       setCampaignRunning(false);
     }
   };
-  const toggle = async (campaign) => {
-    if (expanded === campaign.campaign_id) return setExpanded(null);
-    setExpanded(campaign.campaign_id);
+  const selectCampaign = async (campaign) => {
+    setSelectedCampaignId(campaign.campaign_id);
+    setSelectedScenarioIndex(null);
     if (!details[campaign.campaign_id]) {
       try {
         const detail = await runner.getCampaign(campaign.campaign_id);
@@ -46,6 +52,8 @@ function CampaignHistory({ campaigns, error, runner, session, onRefresh, singleR
       }
     }
   };
+  const selectedCampaign = details[selectedCampaignId];
+  const selectedScenario = selectedCampaign?.scenarios?.[selectedScenarioIndex];
   const rerun = async (campaignId, ordinal) => {
     setRerunning(`${campaignId}:${ordinal}`);
     try {
@@ -56,20 +64,13 @@ function CampaignHistory({ campaigns, error, runner, session, onRefresh, singleR
     }
   };
   return (
-    <article className="card campaign-card">
-      <CardHead label="Campaign history" title="Scenario campaigns" />
-      <p className="campaign-intro">
-        Run every poisoned scenario in filename order with the current session
-        provider.
-      </p>
-      <button
-        className="run-button"
-        onClick={runAll}
-        disabled={campaignRunning || singleRunRunning}
-      >
-        {campaignRunning ? "Campaign running…" : "Run all poisoned scenarios"}{" "}
-        <Icon name="arrow" size={14} />
-      </button>
+    <section className="campaign-workspace">
+      <div className="campaign-history-panel">
+        <CardHead label="Batch campaign" title="Campaign history" />
+        <p className="campaign-intro">Select a campaign, then choose a scenario to inspect its result.</p>
+        <button className="run-button" onClick={runAll} disabled={campaignRunning || singleRunRunning}>
+          {campaignRunning ? "Campaign running…" : "Run all poisoned scenarios"} <Icon name="arrow" size={14} />
+        </button>
       {campaignRunError && (
         <p className="form-error" role="alert">
           {campaignRunError}
@@ -83,16 +84,15 @@ function CampaignHistory({ campaigns, error, runner, session, onRefresh, singleR
       {!error && campaigns.length === 0 && (
         <p className="empty-state campaign-empty">No campaigns recorded yet.</p>
       )}
-      {campaigns.length > 0 && (
-        <div className="campaign-list">
+        {campaigns.length > 0 && <div className="campaign-list">
           {campaigns.map((campaign) => {
             const detail = details[campaign.campaign_id];
             return (
               <div className="campaign-entry" key={campaign.campaign_id}>
                 <button
                   className="campaign-row campaign-toggle"
-                  onClick={() => toggle(campaign)}
-                  aria-expanded={expanded === campaign.campaign_id}
+                  onClick={() => selectCampaign(campaign)}
+                  aria-pressed={selectedCampaignId === campaign.campaign_id}
                 >
                   <div className="campaign-id">
                     <strong>{campaign.campaign_id}</strong>
@@ -124,61 +124,33 @@ function CampaignHistory({ campaigns, error, runner, session, onRefresh, singleR
                     {campaign.status.replaceAll("_", " ")}
                   </span>
                 </button>
-                {expanded === campaign.campaign_id && detail && (
-                  <div className="campaign-details">
-                    {detail.error ? (
-                      <p className="form-error">{detail.error}</p>
-                    ) : (
-                      detail.scenarios.map((scenario, ordinal) => (
-                        <div
-                          className="scenario-detail"
-                          key={`${scenario.filename}-${ordinal}`}
-                        >
-                          <div>
-                            <strong>{scenario.filename}</strong>
-                            <small>
-                              {scenario.scenario_id} · child run{" "}
-                              {scenario.child_run_id || "not created"}
-                            </small>
-                          </div>
-                          <span
-                            className={
-                              scenario.failure_state
-                                ? "red"
-                                : scenario.outcome === "Attack success"
-                                  ? "red"
-                                  : "green"
-                            }
-                          >
-                            {scenario.failure_state || scenario.injection_verdict || scenario.outcome || "Pending"}
-                          </span>
-                          {!scenario.failure_state && <small>{scenario.task_outcome || "Task outcome pending"}</small>}
-                          <button
-                            className="small-button"
-                            disabled={
-                              rerunning === `${campaign.campaign_id}:${ordinal}`
-                            }
-                            onClick={() => rerun(campaign.campaign_id, ordinal)}
-                          >
-                            {rerunning === `${campaign.campaign_id}:${ordinal}`
-                              ? "Rerunning…"
-                              : "Rerun"}
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                )}
               </div>
             );
           })}
         </div>
-      )}
-    </article>
+        }
+      </div>
+      <div className="campaign-breakdown-panel">
+        {!selectedCampaignId && <div className="campaign-empty-selection"><span className="campaign-empty-mark">↗</span><h2>Select a scenario</h2><p>Choose a campaign from the history list to load its scenario results.</p></div>}
+        {selectedCampaignId && selectedCampaign?.error && <p className="form-error">{selectedCampaign.error}</p>}
+        {selectedCampaignId && selectedCampaign && !selectedScenario && !selectedCampaign.error && (
+          <div className="campaign-empty-selection"><span className="campaign-empty-mark">○</span><h2>Select a scenario</h2><p>Choose one of this campaign's scenarios to see its breakdown.</p><div className="campaign-scenario-picker">{selectedCampaign.scenarios.map((scenario, index) => <button key={`${scenario.filename}-${index}`} className="scenario-picker-row" onClick={() => setSelectedScenarioIndex(index)}><span>{scenario.filename}</span><small>{scenario.injection_verdict || scenario.outcome || "Pending"}</small></button>)}</div></div>
+        )}
+        {selectedScenario && <div className="campaign-scenario-breakdown">
+          <div className="breakdown-heading"><div><p className="label">Scenario breakdown</p><h2>{selectedScenario.filename}</h2><small>{selectedScenario.scenario_id} · child run {selectedScenario.child_run_id || "not created"}</small></div><button className="small-button" disabled={rerunning === `${selectedCampaignId}:${selectedScenarioIndex}`} onClick={() => rerun(selectedCampaignId, selectedScenarioIndex)}>{rerunning === `${selectedCampaignId}:${selectedScenarioIndex}` ? "Rerunning…" : "Rerun scenario"}</button></div>
+          <div className="breakdown-status"><span className={selectedScenario.failure_state ? "red" : selectedScenario.injection_verdict === "Attack success" ? "red" : "green"}>{selectedScenario.failure_state || selectedScenario.injection_verdict || selectedScenario.outcome || "Pending"}</span><small>{selectedScenario.task_outcome || "Task outcome pending"}</small></div>
+          <div className="breakdown-grid"><div><small>Injection verdict</small><strong>{selectedScenario.injection_verdict || selectedScenario.outcome || "Pending"}</strong></div><div><small>Task outcome</small><strong>{selectedScenario.task_outcome || "Pending"}</strong></div><div><small>Tool-call status</small><strong>{selectedScenario.tool_call_status || "Pending"}</strong></div><div><small>Failure state</small><strong>{selectedScenario.failure_state || "None"}</strong></div></div>
+          <div className="campaign-trace">
+            <div className="breakdown-section-heading"><p className="label">Full trace</p><small>{selectedScenario.trace?.length || 0} events</small></div>
+            {selectedScenario.trace?.length ? <div className="timeline campaign-timeline">{selectedScenario.trace.map((event, index) => <div key={`${event.kind}-${index}`}><time>{index + 1}</time><i className={event.kind === "policy_decision" ? "red" : "cyan"} /><p><strong>{event.kind.replaceAll("_", " ")}</strong><small>{Object.entries(event.data || {}).map(([key, value]) => `${key}: ${value}`).join(" · ")}</small></p></div>)}</div> : <p className="empty-state">No trace events were persisted for this scenario.</p>}
+          </div>
+        </div>}
+      </div>
+    </section>
   );
 }
 
-export function ExperimentDashboard({ session, runner, onSignedOut, onScenarios }) {
+export function ExperimentDashboard({ session, runner, onSignedOut, onScenarios, user, auth, onSignOut }) {
   const [mode, setMode] = useState("Defended");
   const [running, setRunning] = useState(false);
   const [query, setQuery] = useState("");
@@ -190,6 +162,8 @@ export function ExperimentDashboard({ session, runner, onSignedOut, onScenarios 
   const [campaignError, setCampaignError] = useState("");
   const [scenarios, setScenarios] = useState([]);
   const [scenarioError, setScenarioError] = useState("");
+  const [scenariosLoading, setScenariosLoading] = useState(true);
+  const [runLoading, setRunLoading] = useState(false);
   const [selectedScenarioName, setSelectedScenarioName] = useState("");
   const [traceOpen, setTraceOpen] = useState(false);
   const [selectedRun, setSelectedRun] = useState(null);
@@ -203,7 +177,8 @@ export function ExperimentDashboard({ session, runner, onSignedOut, onScenarios 
         setScenarios(usable);
         setSelectedScenarioName((current) => current || usable[0]?.name || "");
       })
-      .catch((error) => setScenarioError(error.message));
+      .catch((error) => setScenarioError(error.message))
+      .finally(() => setScenariosLoading(false));
   }, [runner]);
   useEffect(() => {
     runner
@@ -235,6 +210,13 @@ export function ExperimentDashboard({ session, runner, onSignedOut, onScenarios 
       ),
     [runs, query],
   );
+  const selectRun = async (run) => {
+    setRunLoading(true);
+    setLoadError("");
+    try { setSelectedRun(await runner.getRun(run.run_id)); }
+    catch (error) { setLoadError(error.message); }
+    finally { setRunLoading(false); }
+  };
   const startRun = async () => {
     setRunning(true);
     setLoadError("");
@@ -258,6 +240,7 @@ export function ExperimentDashboard({ session, runner, onSignedOut, onScenarios 
   return (
     <main className="app-shell">
       <Sidebar
+        user={user} auth={auth} onSignedOut={onSignOut}
         open={sidebarOpen}
         active="dashboard"
         onClose={() => setSidebarOpen(false)}
@@ -265,42 +248,12 @@ export function ExperimentDashboard({ session, runner, onSignedOut, onScenarios 
         onDashboard={() => {}}
         onScenarios={onScenarios}
       />
-      <header className="topbar">
-        <div className="brand">
-          <button
-            className="icon-button menu"
-            aria-label="Open session workspace"
-            onClick={onSignedOut}
-          >
-            <Icon name="menu" size={18} />
-          </button>
-          <span className="logo">P</span>
-          <div>
-            <strong>PoisonTrace</strong>
-            <small>{session.name}</small>
-          </div>
-        </div>
-        <div className="profile">
-          <span className="avatar">SA</span>
-          <div>
-            <strong>SOC analyst</strong>
-            <small>{modelOptions[session.model]}</small>
-          </div>
-          <button
-            className="icon-button"
-            aria-label="Return to sessions"
-            onClick={onSignedOut}
-          >
-            <Icon name="arrow" />
-          </button>
-        </div>
-      </header>
       <section className="welcome">
         <div>
           <h1>
-            Ready to investigate? <span>◌</span>
+            {session.name}
           </h1>
-          <p>Configure a run and follow the evidence as it unfolds.</p>
+          <p>{modelOptions[session.model]} · Select a scenario, run an experiment, and inspect the recorded evidence.</p>
         </div>
         {executionMode === executionModes.single && (
           <button className="run-button" onClick={startRun} disabled={running || !selectedScenario}>
@@ -311,12 +264,11 @@ export function ExperimentDashboard({ session, runner, onSignedOut, onScenarios 
       </section>
       <div
         className="execution-mode"
-        role="tablist"
+        role="group"
         aria-label="Execution workflow"
       >
         <button
-          role="tab"
-          aria-selected={executionMode === executionModes.single}
+          aria-pressed={executionMode === executionModes.single}
           className={executionMode === executionModes.single ? "active" : ""}
           onClick={() =>
             setExecutionMode(selectExecutionMode(executionModes.single))
@@ -325,8 +277,7 @@ export function ExperimentDashboard({ session, runner, onSignedOut, onScenarios 
           Single run
         </button>
         <button
-          role="tab"
-          aria-selected={executionMode === executionModes.campaign}
+          aria-pressed={executionMode === executionModes.campaign}
           className={executionMode === executionModes.campaign ? "active" : ""}
           onClick={() =>
             setExecutionMode(selectExecutionMode(executionModes.campaign))
@@ -355,7 +306,8 @@ export function ExperimentDashboard({ session, runner, onSignedOut, onScenarios 
               />
             </div>
             {scenarioError && <p className="form-error" role="alert">{scenarioError}</p>}
-            {!scenarioError && !scenarios.length && <p className="empty-state">Loading scenarios…</p>}
+            {scenariosLoading && <p role="status">Loading scenarios…</p>}
+            {!scenariosLoading && !scenarioError && !scenarios.length && <div className="empty-state"><p>No valid scenarios are available. Create or repair a scenario before running an experiment.</p><button className="text-button" onClick={onScenarios}>Open scenario library</button></div>}
             <div className="launcher-note">
               <span className="status-dot" />
               <span>Protected actions need approval</span>
@@ -363,24 +315,7 @@ export function ExperimentDashboard({ session, runner, onSignedOut, onScenarios 
             </div>
           </article>
         )}
-        <article className="card focus">
-          <CardHead label="Current focus" title={selectedRun?.id || "No run yet"} />
-          <div className="focus-body">
-            <div className="ring">
-              <span>{selectedRun ? "100%" : "—"}</span>
-              <small>trace</small>
-            </div>
-            <div>
-              <strong>{selectedRun?.scenario_id || "No scenario selected"}</strong>
-              <p>
-                {selectedRun?.mode || mode} · {selectedRun?.model || modelOptions[session.model]}
-              </p>
-              <button className="small-button" disabled={!selectedRun} onClick={() => setTraceOpen(true)}>
-                Inspect trace <Icon name="arrow" size={12} />
-              </button>
-            </div>
-          </div>
-        </article>
+        {executionMode === executionModes.single && <>
         <article className="card outcome">
           <CardHead
             label="Security outcome"
@@ -420,7 +355,7 @@ export function ExperimentDashboard({ session, runner, onSignedOut, onScenarios 
           </div>
         </article>
         <article className="card trace">
-          <CardHead label="Live evidence ledger" title="Trace timeline" />
+          <CardHead label="Recorded evidence" title="Recorded trace" />
           <div className="timeline">
             {selectedRun?.trace?.length ? selectedRun.trace.map((event, index) => (
               <div key={`${event.kind}-${index}`}>
@@ -439,13 +374,13 @@ export function ExperimentDashboard({ session, runner, onSignedOut, onScenarios 
           {traceOpen && (
             <div
               className="trace-placeholder"
-              role="dialog"
+              role="region"
               aria-label="Trace inspection"
             >
               <div className="card-head">
                 <div>
                   <p className="label">Trace inspection</p>
-                  <h2>{runs[0]?.id || "No run selected"}</h2>
+                  <h2>{selectedRun?.id || "Selected run"}</h2>
                 </div>
                 <button
                   className="icon-button"
@@ -456,7 +391,7 @@ export function ExperimentDashboard({ session, runner, onSignedOut, onScenarios 
                 </button>
               </div>
               <p>
-                This inspection surface is ready for the future ordered trace.
+                Recorded events for the selected experiment.
               </p>
               <div className="placeholder-events">
                 {selectedRun?.trace?.map((event, index) => <div key={`${event.kind}-full-${index}`}><i className="cyan" /><span>{event.kind.replaceAll("_", " ")}</span><small>{JSON.stringify(event.data)}</small></div>)}
@@ -468,7 +403,7 @@ export function ExperimentDashboard({ session, runner, onSignedOut, onScenarios 
           <div className="card-head">
             <div>
               <p className="label">Recent runs</p>
-              <h2>Compare conditions</h2>
+              <h2>Recorded experiments</h2>
             </div>
             <div className="search-field">
               <Icon name="search" size={13} />
@@ -485,30 +420,30 @@ export function ExperimentDashboard({ session, runner, onSignedOut, onScenarios 
               {loadError}. Start the local API and try again.
             </p>
           )}
+          {runLoading && <p role="status">Loading selected run…</p>}
           <div className="run-list">
             {filteredRuns.length
               ? filteredRuns.map((run) => (
-                  <div key={run.id}>
+                  <button type="button" className="recorded-run" key={run.id} disabled={runLoading || running} aria-pressed={selectedRun?.run_id === run.run_id} onClick={() => selectRun(run)}>
                     <span className={`run-dot ${run.tone}`} />
-                    <p>
+                    <span>
                       <strong>
                         {run.id} · {run.mode}
                       </strong>
                       <small>
                         {run.injection_verdict || run.result} · {run.task_outcome || "Task outcome unavailable"} · {run.time}
                       </small>
-                    </p>
+                    </span>
                     <b className={run.tone}>{run.mark}</b>
-                  </div>
+                  </button>
                 ))
               : !loadError && (
                   <p className="empty-state">No runs recorded yet.</p>
                 )}
           </div>
-          <button className="link-button">
-            Open comparison view <Icon name="arrow" size={12} />
-          </button>
+
         </article>
+        </>}
         {executionMode === executionModes.campaign && (
           <CampaignHistory
             campaigns={campaigns}

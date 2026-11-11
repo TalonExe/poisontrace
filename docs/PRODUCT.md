@@ -29,6 +29,8 @@ The dashboard is a local research prototype used during experiment setup, execut
 ## Capabilities and Constraints
 
 - The first workflow is synthetic authentication-alert triage.
+- The system needs a local authentication flow with a login page before analysts enter the dashboard.
+- The login flow is a prototype access boundary, not production identity management.
 - Experiments have clean, poisoned, and defended modes.
 - Protected actions require explicit approval.
 - Tool definitions are compared with an approved manifest.
@@ -36,6 +38,7 @@ The dashboard is a local research prototype used during experiment setup, execut
 - The dashboard is dark-first, responsive, and optimized for low interaction delay.
 - A future light-mode toggle must be supported by the design system.
 - No real credentials, production systems, or non-synthetic data may be connected.
+- Do not store real passwords or credentials. Use clearly labelled local demo accounts or a replaceable authentication seam.
 
 ## Brand Commitments
 
