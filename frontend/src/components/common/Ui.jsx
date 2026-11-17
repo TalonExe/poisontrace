@@ -19,6 +19,12 @@ export function Icon({ name, size = 16 }) {
       </>
     ),
     chevron: <path d="m6 9 6 6 6-6" />,
+    close: <path d="m6 6 12 12M6 18 18 6" />,
+    trash: (
+      <>
+        <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v5M14 11v5" />
+      </>
+    ),
     shield: (
       <>
         <path d="M12 3 19 6v5c0 4.6-3 8-7 10-4-2-7-5.4-7-10V6l7-3Z" />
@@ -44,12 +50,13 @@ export function Icon({ name, size = 16 }) {
   );
 }
 
-export function Select({ label, value, onChange, options }) {
+export function Select({ label, value, onChange, options, disabled = false }) {
   return (
     <label className="field">
       <span>{label}</span>
       <div className="select-wrap">
         <select
+          disabled={disabled}
           value={value}
           onChange={(event) => onChange(event.target.value)}
         >

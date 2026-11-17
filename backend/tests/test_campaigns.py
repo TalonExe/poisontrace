@@ -95,7 +95,7 @@ def test_campaign_execution_runs_each_selected_scenario_once_and_aggregates_resu
     assert campaign["total"] == 2
     assert campaign["completed"] == 2
     assert campaign["failed"] == 0
-    assert campaign["attack_successes"] == 2
+    assert campaign["attack_successes"] == 0
     assert [item["filename"] for item in campaign["scenarios"]] == ["a-poisoned.yaml", "b-poisoned.yaml"]
     assert all(item["child_run_id"] is not None for item in campaign["scenarios"])
     assert all(item["model"] == "fake" for item in campaign["results"])
@@ -150,21 +150,14 @@ def test_campaign_history_lists_persisted_summary(tmp_path, analyst_client):
     response = client.get("/api/campaigns")
 
     assert response.status_code == 200
-    assert response.json() == [
-        {
-            "campaign_id": created["campaign_id"],
-            "status": "completed",
-            "provider": "fake",
-            "model": "fake",
-            "credential_id": None,
-            "scenario_count": 1,
-            "completed": 1,
-            "failed": 0,
-            "attack_successes": 1,
-            "injection_successes": 1,
-            "task_successes": 0,
-        }
-    ]
+    summary = response.json()[0]
+    assert summary.items() >= {"campaign_id": created["campaign_id"], "status": "completed",
+        "provider": "fake", "model": "fake", "credential_id": None, "scenario_count": 1,
+        "completed": 1, "failed": 0, "attack_successes": 0, "injection_successes": 1, "task_successes": 1}.items()
+    rates = summary["metrics"]["by_condition"]["poisoned"]
+    assert rates["attacker_goal"] == {"numerator": 0, "denominator": 0, "value": None}
+    assert rates["marker_influence"] == {"numerator": 1, "denominator": 1, "value": 1.0}
+
 
 
 def test_campaign_scenario_details_and_rerun_preserve_campaign_configuration(tmp_path, analyst_client):
@@ -198,7 +191,7 @@ def test_campaign_scenario_details_and_rerun_preserve_campaign_configuration(tmp
     assert scenario["filename"] == "only-poisoned.yaml"
     assert scenario["scenario_id"] == "002"
     assert scenario["child_run_id"] is not None
-    assert scenario["outcome"] == "Attack success"
+    assert scenario["outcome"] == "Marker observed"
     assert scenario["failure_state"] is None
     assert "secret" not in detail.text
 
@@ -209,7 +202,7 @@ def test_campaign_scenario_details_and_rerun_preserve_campaign_configuration(tmp
     assert rerun.json()["model"] == "campaign-model"
     assert rerun.json()["credential_id"] == "cred-ref"
     assert rerun_scenario["child_run_id"] != scenario["child_run_id"]
-    assert rerun_scenario["outcome"] == "Attack success"
+    assert rerun_scenario["outcome"] == "Marker observed"
     assert rerun_scenario["failure_state"] is None
 
 
@@ -239,11 +232,11 @@ def test_complete_campaign_workflow_is_available_through_public_http_seams(tmp_p
     assert history.status_code == 200
     assert history.json()[0]["campaign_id"] == campaign_id
     assert history.json()[0]["completed"] == 2
-    assert history.json()[0]["attack_successes"] == 2
+    assert history.json()[0]["attack_successes"] == 0
 
     details = client.get(f"/api/campaigns/{campaign_id}")
     assert details.status_code == 200
-    assert all(item["outcome"] == "Attack success" for item in details.json()["scenarios"])
+    assert all(item["outcome"] == "Marker observed" for item in details.json()["scenarios"])
 
     rerun = client.post(f"/api/campaigns/{campaign_id}/scenarios/1/rerun")
     assert rerun.status_code == 200
@@ -252,7 +245,7 @@ def test_complete_campaign_workflow_is_available_through_public_http_seams(tmp_p
     refreshed_history = client.get("/api/campaigns")
     assert refreshed_history.status_code == 200
     assert refreshed_history.json()[0]["completed"] == 2
-    assert refreshed_history.json()[0]["attack_successes"] == 2
+    assert refreshed_history.json()[0]["attack_successes"] == 0
 
 
 def test_campaign_http_errors_and_ordered_child_traces(tmp_path, analyst_client):

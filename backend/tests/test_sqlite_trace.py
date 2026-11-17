@@ -1,3 +1,4 @@
+from dataclasses import replace
 from poisontrace.domain import ExperimentMode, ExperimentResult
 from poisontrace.adapters.persistence.traces import SqliteTraceStore, TraceEvent
 
@@ -18,7 +19,7 @@ def test_sqlite_trace_store_persists_events_and_results(tmp_path):
     reopened = SqliteTraceStore(database)
 
     assert reopened.events_for(run_id)[0].kind == "recommendation_created"
-    assert reopened.result_for(run_id) == result
+    assert reopened.result_for(run_id) == replace(result, run_id=run_id)
 
 
 def test_sqlite_trace_store_keeps_interleaved_run_events_separate(tmp_path):

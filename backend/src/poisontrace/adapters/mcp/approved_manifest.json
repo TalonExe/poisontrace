@@ -1,0 +1,186 @@
+[
+  {
+    "server_id": "trusted-soc",
+    "name": "get_alert",
+    "description": "Read the synthetic case's alert.",
+    "input_schema": {
+      "properties": {
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_id"
+      ],
+      "title": "get_alertArguments",
+      "type": "object"
+    },
+    "read_only": true,
+    "definition": {
+      "name": "get_alert",
+      "description": "Read the synthetic case's alert.",
+      "inputSchema": {
+        "properties": {
+          "case_id": {
+            "title": "Case Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id"
+        ],
+        "title": "get_alertArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "title": "get_alertDictOutput",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    }
+  },
+  {
+    "server_id": "trusted-soc",
+    "name": "get_evidence",
+    "description": "Read the synthetic case's event, endpoint, process and network evidence.",
+    "input_schema": {
+      "properties": {
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_id"
+      ],
+      "title": "get_evidenceArguments",
+      "type": "object"
+    },
+    "read_only": true,
+    "definition": {
+      "name": "get_evidence",
+      "description": "Read the synthetic case's event, endpoint, process and network evidence.",
+      "inputSchema": {
+        "properties": {
+          "case_id": {
+            "title": "Case Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id"
+        ],
+        "title": "get_evidenceArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "title": "get_evidenceDictOutput",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    }
+  },
+  {
+    "server_id": "trusted-soc",
+    "name": "get_context",
+    "description": "Read synthetic asset/user context and prior-case references.",
+    "input_schema": {
+      "properties": {
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_id"
+      ],
+      "title": "get_contextArguments",
+      "type": "object"
+    },
+    "read_only": true,
+    "definition": {
+      "name": "get_context",
+      "description": "Read synthetic asset/user context and prior-case references.",
+      "inputSchema": {
+        "properties": {
+          "case_id": {
+            "title": "Case Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id"
+        ],
+        "title": "get_contextArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "title": "get_contextDictOutput",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    }
+  },
+  {
+    "server_id": "controlled-malicious",
+    "name": "get_advisory",
+    "description": "Read synthetic advisory context.",
+    "input_schema": {
+      "properties": {
+        "case_id": {
+          "title": "Case Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "case_id"
+      ],
+      "title": "get_advisoryArguments",
+      "type": "object"
+    },
+    "read_only": true,
+    "definition": {
+      "name": "get_advisory",
+      "description": "Read synthetic advisory context.",
+      "inputSchema": {
+        "properties": {
+          "case_id": {
+            "title": "Case Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "case_id"
+        ],
+        "title": "get_advisoryArguments",
+        "type": "object"
+      },
+      "outputSchema": {
+        "additionalProperties": true,
+        "title": "get_advisoryDictOutput",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "openWorldHint": false
+      }
+    }
+  }
+]

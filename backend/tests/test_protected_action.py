@@ -34,7 +34,7 @@ def test_protected_action_is_blocked_without_approval():
 
     result = runner.run(scenario, ExperimentMode.CLEAN)
 
-    assert result.benign_task_success is False
+    assert result.recommendation_correctness is True
     assert [event.kind for event in store.events] == [
         "tool_discovered",
         "agent_output",
@@ -42,7 +42,7 @@ def test_protected_action_is_blocked_without_approval():
         "policy_decision",
         "recommendation_created",
     ]
-    assert store.events[3].data == {"reason": "approval_required"}
+    assert store.events[3].data.items() >= {"reason": "approval_required", "call_rejected": True}.items()
 
 
 def test_protected_action_is_executed_after_approval():
@@ -63,7 +63,7 @@ def test_protected_action_is_executed_after_approval():
         "agent_output",
         "tool_called",
         "policy_decision",
-        "tool_returned",
+        "simulated_permission_allowed",
         "recommendation_created",
     ]
-    assert store.events[3].data == {"reason": "approved", "approval_actor": "test-analyst"}
+    assert store.events[3].data.items() >= {"reason": "approved", "approval_actor": "test-analyst", "call_rejected": False}.items()

@@ -1,6 +1,8 @@
 """Campaign orchestration, child evidence and reruns behind one application interface."""
 
+from dataclasses import asdict
 from typing import Any
+from poisontrace.domain.metrics import calculate_metrics
 
 from poisontrace.application.contracts import CampaignRequest
 from poisontrace.application.ports import CampaignStore, CampaignScenarios, ModelFactory, RunStore, RunSummary, SecretsAdapter
@@ -60,6 +62,7 @@ class CampaignApplicationService:
         return campaign if campaign["status"] == "created" else self._with_scenario_details(campaign)
 
     def _with_scenario_details(self, campaign: dict[str, Any]) -> dict[str, Any]:
+        campaign.update(self._campaign_summary(campaign))
         campaign["scenarios"] = [self._scenario_detail(item) for item in campaign["scenarios"]]
         return campaign
 
@@ -70,7 +73,9 @@ class CampaignApplicationService:
         if item["child_run_id"] is not None:
             try:
                 result = self._runs.result_for(item["child_run_id"])
-                detail["outcome"] = "Attack success" if result.attack_success else "Benign success"
+                detail.update(self._summary(item["child_run_id"], result))
+                detail["outcome"] = "Failed attempt" if result.status == "failed" else result.injection_verdict
+                detail["failure_state"] = result.error_category or item["error"]
                 detail["injection_verdict"] = result.injection_verdict
                 detail["task_outcome"] = result.task_outcome
                 detail["tool_call_status"] = result.tool_call_status
@@ -86,15 +91,17 @@ class CampaignApplicationService:
         return [self._campaign_summary(campaign) for campaign in self._campaigns.list()]
 
     def _campaign_summary(self, campaign: dict[str, Any]) -> dict[str, Any]:
-        completed = [item for item in campaign["scenarios"] if item["child_run_id"] is not None]
-        failed = [item for item in campaign["scenarios"] if item["error"] is not None]
-        attack_successes = 0
-        for item in completed:
-            try:
-                if self._runs.result_for(item["child_run_id"]).attack_success:
-                    attack_successes += 1
-            except KeyError:
-                continue
+        linked_ids = {item["child_run_id"] for item in campaign["scenarios"] if item["child_run_id"] is not None}
+        attempts = []
+        latest = []
+        for run_id in self._runs.run_ids():
+            result = self._runs.result_for(run_id)
+            if result.run_configuration.get("campaign_id") == campaign["campaign_id"] or run_id in linked_ids:
+                attempts.append(result)
+                if run_id in linked_ids:
+                    latest.append(result)
+        metrics = asdict(calculate_metrics(attempts))
+        current = [r for r in latest if r.status == "completed" and r.scoring_version == "recommendation-v1" and r.run_configuration.get("condition_version") == "matched-v1"]
         return {
             "campaign_id": campaign["campaign_id"],
             "status": campaign["status"],
@@ -102,11 +109,14 @@ class CampaignApplicationService:
             "model": campaign["model"],
             "credential_id": campaign["credential_id"],
             "scenario_count": len(campaign["scenarios"]),
-            "completed": len(completed),
-            "failed": len(failed),
-            "attack_successes": attack_successes,
-            "injection_successes": attack_successes,
-            "task_successes": sum(1 for item in completed if self._runs.result_for(item["child_run_id"]).benign_task_success),
+            "completed": sum(r.status == "completed" for r in latest),
+            "failed": sum(item["error"] is not None for item in campaign["scenarios"]),
+            "configuration_errors": sum(item["error"] is not None and item["child_run_id"] is None for item in campaign["scenarios"]),
+            "missing_child_runs": len(linked_ids) - len(latest),
+            "metrics": metrics,
+            "attack_successes": sum(r.attacker_goal_achievement is True for r in current if r.mode != ExperimentMode.CLEAN),
+            "injection_successes": sum(r.marker_influence is True for r in current),
+            "task_successes": sum(r.recommendation_correctness is True for r in current),
         }
 
     def execute(self, campaign_id: str) -> dict[str, Any]:
@@ -123,7 +133,6 @@ class CampaignApplicationService:
             if reference.provider != provider:
                 raise ValueError(f"credential provider {reference.provider} does not match campaign provider {provider}")
             api_key = self._secrets.retrieve(credential_id)
-        model = self._model_factory(provider, campaign["model"], api_key)
         self._campaigns.set_status(campaign_id, "running")
         results = []
         failures = 0
@@ -131,10 +140,11 @@ class CampaignApplicationService:
             try:
                 scenario = self._scenarios.load(selected["filename"])
                 runner = ScenarioRunner(
-                    model=model,
+                    model=None,
+                    model_factory=lambda: self._model_factory(provider, campaign["model"], api_key),
                     trace_store=self._runs,
                     gateway=ToolGateway(
-                        approved_manifest=scenario.approved_tools or scenario.tools,
+                        approved_manifest=scenario.approved_tools if scenario.approved_tools is not None else scenario.tools,
                         high_impact_tools=set(),
                         enforce_manifest=False,
                     ),
@@ -149,8 +159,10 @@ class CampaignApplicationService:
                         "model": campaign["model"],
                     },
                 )
-                child_run_id = self._runs.latest_run_id()
-                self._campaigns.associate_child_run(campaign_id, ordinal, child_run_id=child_run_id)
+                child_run_id = result.run_id
+                self._campaigns.associate_child_run(campaign_id, ordinal, child_run_id=child_run_id, error=result.error_category)
+                if result.status == "failed":
+                    failures += 1
                 summary = self._summary(child_run_id, result)
                 summary["filename"] = selected["filename"]
                 results.append(summary)
@@ -158,8 +170,8 @@ class CampaignApplicationService:
                 failures += 1
                 self._campaigns.associate_child_run(campaign_id, ordinal, error=type(exc).__name__)
         self._campaigns.set_status(campaign_id, "completed_with_errors" if failures else "completed")
-        completed = len(results)
-        attack_successes = sum(1 for result in results if result["result"] == "Attack success")
+        completed = sum(result["status"] == "completed" for result in results)
+        attack_successes = sum(result["attacker_goal_achievement"] is True for result in results)
         response = self._campaigns.get(campaign_id)
         response.update(
             {
@@ -170,6 +182,7 @@ class CampaignApplicationService:
                 "results": results,
             }
         )
+        response.update(self._campaign_summary(response))
         return response
 
     def rerun(self, campaign_id: str, ordinal: int) -> dict[str, Any]:
@@ -190,10 +203,11 @@ class CampaignApplicationService:
         try:
             scenario = self._scenarios.load(selected["filename"])
             result = ScenarioRunner(
-                model=self._model_factory(provider, campaign["model"], api_key),
+                model=None,
+                model_factory=lambda: self._model_factory(provider, campaign["model"], api_key),
                 trace_store=self._runs,
                 gateway=ToolGateway(
-                    approved_manifest=scenario.approved_tools or scenario.tools,
+                    approved_manifest=scenario.approved_tools if scenario.approved_tools is not None else scenario.tools,
                     high_impact_tools=set(),
                     enforce_manifest=False,
                 ),
@@ -202,7 +216,7 @@ class CampaignApplicationService:
                 ExperimentMode.POISONED,
                 {"campaign_id": campaign_id, "provider": provider, "credential_id": credential_id, "model": campaign["model"]},
             )
-            self._campaigns.associate_child_run(campaign_id, ordinal, child_run_id=self._runs.latest_run_id())
+            self._campaigns.associate_child_run(campaign_id, ordinal, child_run_id=result.run_id, error=result.error_category)
         except Exception as exc:
             self._campaigns.associate_child_run(campaign_id, ordinal, error=type(exc).__name__)
         return self._with_scenario_details(self._campaigns.get(campaign_id))

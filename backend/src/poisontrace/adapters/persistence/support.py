@@ -16,5 +16,7 @@ def initialize_database(database: Path) -> None:
         columns = {row[1] for row in connection.execute("PRAGMA table_info(runs)")}
         for name, definition in (("model_name", "TEXT NOT NULL DEFAULT 'unknown'"), ("prompt_version", "TEXT NOT NULL DEFAULT 'unknown'"), ("run_configuration", "TEXT NOT NULL DEFAULT '{}'"), ("injection_verdict", "TEXT NOT NULL DEFAULT 'Blocked'"), ("task_outcome", "TEXT NOT NULL DEFAULT 'Failed'"), ("tool_call_status", "TEXT NOT NULL DEFAULT 'Not requested'")):
             if name not in columns: connection.execute(f"ALTER TABLE runs ADD COLUMN {name} {definition}")
+        if "outcome_evidence" not in columns:
+            connection.execute("ALTER TABLE runs ADD COLUMN outcome_evidence TEXT NOT NULL DEFAULT '{}'")
         if "run_key" not in {row[1] for row in connection.execute("PRAGMA table_info(events)")}: connection.execute("ALTER TABLE events ADD COLUMN run_key TEXT")
         if "error" not in {row[1] for row in connection.execute("PRAGMA table_info(campaign_scenarios)")}: connection.execute("ALTER TABLE campaign_scenarios ADD COLUMN error TEXT")

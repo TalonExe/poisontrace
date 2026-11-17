@@ -1,0 +1,141 @@
+{
+  "approved": true,
+  "repository": "TalonExe/poisontrace",
+  "native_dependencies": false,
+  "dependency_format": "Explicit Blocked by issue links; native mutation unavailable and CLI network blocked",
+  "issues": [
+    {
+      "id": "T01",
+      "issue_number": 20,
+      "url": "https://github.com/TalonExe/poisontrace/issues/20",
+      "title": "Separate execution from saved-results review",
+      "label": "ready-for-agent",
+      "blocked_by": []
+    },
+    {
+      "id": "T02",
+      "issue_number": 21,
+      "url": "https://github.com/TalonExe/poisontrace/issues/21",
+      "title": "Investigate one clean case through a real read-only MCP server",
+      "label": "ready-for-agent",
+      "blocked_by": []
+    },
+    {
+      "id": "T03",
+      "issue_number": 22,
+      "url": "https://github.com/TalonExe/poisontrace/issues/22",
+      "title": "Run evidence-based investigations with Gemini",
+      "label": "ready-for-agent",
+      "blocked_by": [
+        21
+      ]
+    },
+    {
+      "id": "T04",
+      "issue_number": 23,
+      "url": "https://github.com/TalonExe/poisontrace/issues/23",
+      "title": "Run evidence-based investigations with OpenAI",
+      "label": "ready-for-agent",
+      "blocked_by": [
+        21
+      ]
+    },
+    {
+      "id": "T05",
+      "issue_number": 24,
+      "url": "https://github.com/TalonExe/poisontrace/issues/24",
+      "title": "Demonstrate poisoning and cross-server shadowing",
+      "label": "ready-for-agent",
+      "blocked_by": [
+        21
+      ]
+    },
+    {
+      "id": "T06",
+      "issue_number": 25,
+      "url": "https://github.com/TalonExe/poisontrace/issues/25",
+      "title": "Enforce manifest policy before exposure and invocation",
+      "label": "ready-for-agent",
+      "blocked_by": [
+        24
+      ]
+    },
+    {
+      "id": "T07",
+      "issue_number": 26,
+      "url": "https://github.com/TalonExe/poisontrace/issues/26",
+      "title": "Score structured decisions and explicit attack goals",
+      "label": "ready-for-agent",
+      "blocked_by": [
+        24
+      ]
+    },
+    {
+      "id": "T08",
+      "issue_number": 27,
+      "url": "https://github.com/TalonExe/poisontrace/issues/27",
+      "title": "Complete the fifteen-case synthetic research corpus",
+      "label": "ready-for-agent",
+      "blocked_by": [
+        26
+      ]
+    },
+    {
+      "id": "T09",
+      "issue_number": 28,
+      "url": "https://github.com/TalonExe/poisontrace/issues/28",
+      "title": "Run repeatable matched groups and compare them on Results",
+      "label": "ready-for-agent",
+      "blocked_by": [
+        20,
+        25,
+        26
+      ]
+    },
+    {
+      "id": "T10",
+      "issue_number": 29,
+      "url": "https://github.com/TalonExe/poisontrace/issues/29",
+      "title": "Prepare the evaluation protocol and complete an offline rehearsal",
+      "label": "ready-for-agent",
+      "blocked_by": [
+        27,
+        28
+      ]
+    },
+    {
+      "id": "T11",
+      "issue_number": 30,
+      "url": "https://github.com/TalonExe/poisontrace/issues/30",
+      "title": "Verify the bounded software release and align research documentation",
+      "label": "ready-for-agent",
+      "blocked_by": [
+        22,
+        23,
+        29
+      ]
+    },
+    {
+      "id": "T12",
+      "issue_number": 31,
+      "url": "https://github.com/TalonExe/poisontrace/issues/31",
+      "title": "Conduct the authorized one-model research evaluation",
+      "label": "needs-info",
+      "blocked_by": [
+        30
+      ]
+    }
+  ],
+  "publication_status": "published_and_read_back_verified",
+  "verified_at": "2026-11-11",
+  "verification": [
+    "All twelve issue titles and full bodies matched approved content",
+    "All issues open with expected labels",
+    "All Blocked by references resolve to actual issues, with no unresolved T IDs"
+  ],
+  "initial_frontier": [
+    20,
+    21
+  ],
+  "paid_evaluation_issue": 31
+}

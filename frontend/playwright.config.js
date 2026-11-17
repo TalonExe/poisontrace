@@ -2,9 +2,11 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  globalTeardown: "./e2e/preview-teardown.mjs",
+  testIgnore: "**/connected/**",
   use: { baseURL: "http://127.0.0.1:4173" },
   webServer: {
-    command: "npm run preview -- --host 127.0.0.1",
+    command: "node e2e/connected/preview.mjs 4173",
     url: "http://127.0.0.1:4173",
     reuseExistingServer: true,
   },

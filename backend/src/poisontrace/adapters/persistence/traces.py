@@ -1,3 +1,4 @@
+from dataclasses import asdict, replace
 import json
 import sqlite3
 from pathlib import Path
@@ -10,7 +11,10 @@ from poisontrace.adapters.persistence.support import initialize_database
 class InMemoryTraceStore:
     def __init__(self) -> None: self.events, self.results = [], []
     def record(self, event: TraceEvent) -> None: self.events.append(event)
-    def save_result(self, result: ExperimentResult, run_key: str | None = None) -> int: self.results.append(result); return len(self.results)
+    def save_result(self, result: ExperimentResult, run_key: str | None = None) -> int:
+        run_id = len(self.results) + 1
+        self.results.append(replace(result, run_id=run_id))
+        return run_id
 
 
 class SqliteTraceStore:
@@ -20,15 +24,27 @@ class SqliteTraceStore:
     def save_result(self, result: ExperimentResult, run_key: str | None = None) -> int:
         if run_key is None: raise ValueError("run_key is required when saving a SQLite trace result")
         with sqlite3.connect(self.database) as c:
-            cursor = c.execute("INSERT INTO runs (scenario_id,mode,recommendation,benign_task_success,attack_success,execution_time_ms,system_error,unauthorised_tool_call,model_name,prompt_version,run_configuration,injection_verdict,task_outcome,tool_call_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (result.scenario_id,result.mode.value,result.recommendation,result.benign_task_success,result.attack_success,result.execution_time_ms,result.system_error,result.unauthorised_tool_call,result.model_name,result.prompt_version,json.dumps(result.run_configuration or {}),result.injection_verdict,result.task_outcome,result.tool_call_status))
-            run_id = cursor.lastrowid; c.execute("UPDATE events SET run_id=? WHERE run_id IS NULL AND run_key=?", (run_id, run_key)); return run_id
+            cursor = c.execute("INSERT INTO runs (scenario_id,mode,recommendation,benign_task_success,attack_success,execution_time_ms,system_error,unauthorised_tool_call,model_name,prompt_version,run_configuration,injection_verdict,task_outcome,tool_call_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (result.scenario_id,result.mode.value,result.recommendation,bool(result.benign_task_success),bool(result.attack_success),result.execution_time_ms,result.system_error,result.unauthorised_tool_call,result.model_name,result.prompt_version,json.dumps(result.run_configuration or {}),result.injection_verdict,result.task_outcome,result.tool_call_status))
+            run_id = cursor.lastrowid
+            evidence = {key: value for key, value in asdict(result).items() if key in {
+                "scoring_version", "marker_influence", "attacker_goal_achievement", "recommendation_correctness",
+                "expected_recommendation", "attacker_target_recommendation",
+                "defense_evidence_version", "manifest_check_performed", "definition_mismatch", "call_rejected",
+                "policy_reason", "proposed_tool_name", "clean_call_legitimate", "gateway_simulated", "status", "error_category", "investigation"
+            }}
+            c.execute("UPDATE runs SET outcome_evidence=? WHERE id=?", (json.dumps(evidence), run_id))
+            c.execute("UPDATE events SET run_id=? WHERE run_id IS NULL AND run_key=?", (run_id, run_key)); return run_id
     def events_for(self, run_id: int) -> list[TraceEvent]:
         with sqlite3.connect(self.database) as c: rows = c.execute("SELECT kind,data FROM events WHERE run_id=? ORDER BY id", (run_id,)).fetchall()
         return [TraceEvent(kind, json.loads(data)) for kind, data in rows]
     def result_for(self, run_id: int) -> ExperimentResult:
-        with sqlite3.connect(self.database) as c: row = c.execute("SELECT scenario_id,mode,recommendation,benign_task_success,attack_success,execution_time_ms,system_error,unauthorised_tool_call,model_name,prompt_version,run_configuration,injection_verdict,task_outcome,tool_call_status FROM runs WHERE id=?", (run_id,)).fetchone()
+        with sqlite3.connect(self.database) as c: row = c.execute("SELECT scenario_id,mode,recommendation,benign_task_success,attack_success,execution_time_ms,system_error,unauthorised_tool_call,model_name,prompt_version,run_configuration,injection_verdict,task_outcome,tool_call_status,outcome_evidence FROM runs WHERE id=?", (run_id,)).fetchone()
         if row is None: raise KeyError(run_id)
-        return ExperimentResult(row[0], ExperimentMode(row[1]), row[2], bool(row[3]), bool(row[4]), row[5], bool(row[6]), bool(row[7]), row[8], row[9], json.loads(row[10]), row[11], row[12], row[13])
+        result = ExperimentResult(row[0], ExperimentMode(row[1]), row[2], bool(row[3]), bool(row[4]), row[5], bool(row[6]), bool(row[7]), row[8], row[9], json.loads(row[10]), row[11], row[12], row[13])
+        evidence = json.loads(row[14])
+        if evidence.get("scoring_version", "legacy") != "legacy":
+            result = replace(result, **evidence, attack_success=evidence.get("attacker_goal_achievement"), benign_task_success=evidence.get("recommendation_correctness"))
+        return replace(result, run_id=run_id)
     def latest_result(self) -> ExperimentResult: return self.result_for(self.latest_run_id())
     def run_ids(self) -> list[int]:
         with sqlite3.connect(self.database) as c: return [row[0] for row in c.execute("SELECT id FROM runs ORDER BY id DESC")]

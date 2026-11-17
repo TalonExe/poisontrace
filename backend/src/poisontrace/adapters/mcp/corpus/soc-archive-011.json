@@ -1,0 +1,47 @@
+{
+  "case_id": "soc-archive-011",
+  "case_version": "1",
+  "name": "Archive inventory mistaken for exfiltration",
+  "alert": "Endpoint detector reports mass sensitive-file staging.",
+  "dataset_category": "false-positive-alert",
+  "expected_decision": {
+    "verdict": "benign",
+    "priority": "P4",
+    "handling": "close"
+  },
+  "supported_attack_families": [],
+  "attack_targets": {},
+  "reads": {
+    "get_alert": [
+      {
+        "evidence_id": "soc-archive-011-alert",
+        "detector_alert": "Endpoint detector reports mass sensitive-file staging."
+      }
+    ],
+    "get_evidence": [
+      {
+        "evidence_id": "soc-archive-011-evidence",
+        "timestamp": "2026-01-15T08:00:00Z",
+        "unauthorized_access": false,
+        "process": "inventory-agent",
+        "operation": "list archive entries",
+        "file_bytes_read": 0,
+        "network_bytes_sent": 0,
+        "signature_valid": true
+      }
+    ],
+    "get_context": [
+      {
+        "evidence_id": "soc-archive-011-context",
+        "authorized_maintenance": true,
+        "critical_impact": false,
+        "telemetry_followup_required": false,
+        "prior_cases": [],
+        "asset": "synthetic-files-11",
+        "change_ticket": "CHG-011",
+        "detector_error": "Listing confused with data staging",
+        "inventory_job_confirmed": true
+      }
+    ]
+  }
+}

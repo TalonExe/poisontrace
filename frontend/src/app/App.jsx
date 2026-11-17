@@ -7,6 +7,7 @@ import { createRouter, routes } from "../utils/router";
 import { LoginRoute } from "../routes/login";
 import { SessionsRoute } from "../routes/sessions/index";
 import { DashboardRoute } from "../routes/dashboard";
+import { ResultsRoute } from "../routes/results";
 import { ScenarioLibraryRoute } from "../routes/scenarios/index";
 import { NewScenarioRoute } from "../routes/scenarios/new";
 import { ScenarioDetailRoute } from "../routes/scenarios/$scenarioId";
@@ -67,6 +68,7 @@ export function App() {
     router.navigate(routes.sessions);
   };
   const openScenarios = () => router.navigate(routes.scenarios);
+  const openResults = (path = routes.results) => router.navigate(path);
 
   routeRenderer.current = () => {
     if (accessError) return <main className="login-shell"><section className="login-panel"><h1>Connection unavailable</h1><p role="alert">{accessError}</p><button className="run-button" onClick={() => { setChecking(true); setAccessAttempt((value) => value + 1); }}>Retry connection</button></section></main>;
@@ -96,6 +98,8 @@ export function App() {
     if (router.current() === routes.adminUsers)
       return <AdminUsers api={adminApi} user={user} auth={auth} onSignedOut={completeSignOut} />;
     const path = router.current();
+    if (path === routes.results || path.startsWith("/results/"))
+      return <ResultsRoute path={path} runner={runner} user={user} auth={auth} onSignOut={completeSignOut} onSessions={openSessions} onDashboard={() => router.navigate(routes.dashboard)} onScenarios={openScenarios} onNavigate={openResults} />;
     if (path === routes.scenarios)
       return (
         <>
@@ -108,6 +112,7 @@ export function App() {
             onClose={() => setSidebarOpen(false)}
             onSessions={openSessions}
             onDashboard={() => router.navigate(routes.dashboard)}
+            onResults={() => openResults()}
             onScenarios={() => {}}
           />
           <ScenarioLibraryRoute
@@ -131,6 +136,7 @@ export function App() {
             onClose={() => setSidebarOpen(false)}
             onSessions={openSessions}
             onDashboard={() => router.navigate(routes.dashboard)}
+            onResults={() => openResults()}
             onScenarios={openScenarios}
           />
           <NewScenarioRoute
@@ -154,6 +160,7 @@ export function App() {
             onClose={() => setSidebarOpen(false)}
             onSessions={openSessions}
             onDashboard={() => router.navigate(routes.dashboard)}
+            onResults={() => openResults()}
             onScenarios={openScenarios}
           />
           <ScenarioDetailRoute
@@ -176,6 +183,7 @@ export function App() {
           runner={runner}
           onSignedOut={openSessions}
           onScenarios={openScenarios}
+          onResults={openResults}
         />
       );
     return (
@@ -185,6 +193,8 @@ export function App() {
         runner={runner}
         onSignOut={completeSignOut}
         onScenarios={openScenarios}
+        onResults={() => openResults()}
+        onDashboard={() => router.navigate(routes.dashboard)}
         onOpenSession={openSession}
       />
     );

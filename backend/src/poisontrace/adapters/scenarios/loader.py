@@ -31,6 +31,7 @@ def load_scenario(path: Path) -> Scenario:
         expected_recommendation=document["expected_recommendation"],
         tools=tools,
         approved_tools=approved_tools,
+        attacker_target_recommendation=document.get("attacker_target_recommendation"),
         safe_fallback_recommendation=document.get("safe_fallback_recommendation"),
     )
 

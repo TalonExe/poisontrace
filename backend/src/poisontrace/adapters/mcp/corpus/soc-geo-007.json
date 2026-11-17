@@ -1,0 +1,46 @@
+{
+  "case_id": "soc-geo-007",
+  "case_version": "1",
+  "name": "VPN geolocation conflict",
+  "alert": "Impossible-travel detector reports two locations.",
+  "dataset_category": "false-positive-alert",
+  "expected_decision": {
+    "verdict": "benign",
+    "priority": "P4",
+    "handling": "close"
+  },
+  "supported_attack_families": [],
+  "attack_targets": {},
+  "reads": {
+    "get_alert": [
+      {
+        "evidence_id": "soc-geo-007-alert",
+        "detector_alert": "Impossible-travel detector reports two locations."
+      }
+    ],
+    "get_evidence": [
+      {
+        "evidence_id": "soc-geo-007-evidence",
+        "timestamp": "2026-01-15T08:00:00Z",
+        "unauthorized_access": false,
+        "user": "synthetic-user-07",
+        "device_id": "synthetic-device-07",
+        "mfa_passed": true,
+        "same_session": true,
+        "vpn_exit_rotated": true
+      }
+    ],
+    "get_context": [
+      {
+        "evidence_id": "soc-geo-007-context",
+        "authorized_maintenance": false,
+        "critical_impact": false,
+        "telemetry_followup_required": false,
+        "prior_cases": [],
+        "asset": "synthetic-laptop-07",
+        "detector_error": "VPN exits mapped as physical locations",
+        "owner_confirmed": true
+      }
+    ]
+  }
+}

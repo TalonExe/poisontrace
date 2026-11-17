@@ -42,6 +42,16 @@ def build_model(provider: str, model: str | None, api_key: str | None = None) ->
     raise ValueError(f"unsupported provider: {provider}")
 
 
+def build_investigation_model(provider, model, api_key):
+    from poisontrace.adapters.models.gemini_investigation import GeminiInvestigationModel
+    if provider == "gemini":
+        return GeminiInvestigationModel(model_name=model, api_key=api_key)
+    if provider == "openai":
+        from poisontrace.adapters.models.openai_investigation import OpenAIInvestigationModel
+        return OpenAIInvestigationModel(model_name=model, api_key=api_key)
+    raise ValueError("unsupported investigation provider")
+
+
 @dataclass(frozen=True)
 class Backend:
     scenario_dir: Path
@@ -53,6 +63,7 @@ class Backend:
     scenario_service: ScenarioService
     runs: RunApplicationService
     campaign_service: CampaignApplicationService
+    groups: object
 
 
 def build_backend(
@@ -60,17 +71,32 @@ def build_backend(
     secrets: SecretsAdapter | None = None,
     *,
     model_factory: ModelFactory = build_model,
+    investigation_model_factory=build_investigation_model,
 ) -> Backend:
     store = SqliteTraceStore(config.database)
     campaigns = SqliteCampaignStore(config.database)
     scenarios = YamlScenarioRepository(config.scenario_dir)
     scenario_service = ScenarioService(scenarios)
     credentials = CredentialApplicationService(secrets)
-    runs = RunApplicationService(store, scenario_service, model_factory, secrets)
+    from poisontrace.adapters.mcp.cases import BundledCases, approved_evidence_manifest
+    from poisontrace.adapters.mcp.transport import LocalSocTransport
+    from poisontrace.adapters.models.scripted_investigation import ScriptedInvestigationModel
+    from poisontrace.application.investigation import InvestigationRunner
+
+    investigations = InvestigationRunner(store, BundledCases(config.database.parent / "investigation-cases"), LocalSocTransport(),
+        ScriptedInvestigationModel, ToolGateway((), set()), approved_manifest=approved_evidence_manifest())
+    runs = RunApplicationService(store, scenario_service, model_factory, secrets, investigations, investigation_model_factory)
     campaign_service = CampaignApplicationService(
         campaigns, store, CampaignScenarioFiles(config.scenario_dir), model_factory, runs.summary, secrets,
     )
-    return Backend(config.scenario_dir, store, campaigns, secrets, credentials, scenarios, scenario_service, runs, campaign_service)
+    from poisontrace.adapters.persistence.run_groups import SqliteRunGroupStore
+    from poisontrace.application.run_groups import RunGroupService
+    from poisontrace.adapters.models.gemini_investigation import GeminiInvestigationModel
+    from poisontrace.adapters.models.openai_investigation import OpenAIInvestigationModel
+    profiles = {provider: dict(prompt_version=model.prompt_version, settings=model.settings, prompt_snapshot=model.prompt_snapshot) for provider,model in
+                [('scripted',ScriptedInvestigationModel),('gemini',GeminiInvestigationModel),('openai',OpenAIInvestigationModel)]}
+    groups = RunGroupService(SqliteRunGroupStore(config.database), runs, profiles)
+    return Backend(config.scenario_dir, store, campaigns, secrets, credentials, scenarios, scenario_service, runs, campaign_service, groups)
 
 
 def build_local_secrets(config: WebConfig | None = None) -> EncryptedSqliteSecrets:
@@ -132,10 +158,11 @@ def build_cli_runner(
     model_factory: Callable[[str], AgentModel] = build_cli_model,
 ) -> ScenarioRunner:
     return ScenarioRunner(
-        model=model_factory(model_name),
+        model=None,
+        model_factory=lambda: model_factory(model_name),
         trace_store=InMemoryTraceStore(),
         gateway=ToolGateway(
-            approved_manifest=scenario.approved_tools or scenario.tools,
+            approved_manifest=scenario.approved_tools if scenario.approved_tools is not None else scenario.tools,
             high_impact_tools={tool.name for tool in scenario.tools} & PROTECTED_TOOL_NAMES,
             enforce_manifest=mode != ExperimentMode.POISONED,
         ),
@@ -152,10 +179,11 @@ def build_cli_benchmark(
 ) -> BenchmarkRunner:
     def make_runner() -> ScenarioRunner:
         return ScenarioRunner(
-            model=model_factory(model_name),
+            model=None,
+            model_factory=lambda: model_factory(model_name),
             trace_store=InMemoryTraceStore(),
             gateway=ToolGateway(
-                approved_manifest=scenario.approved_tools or scenario.tools,
+                approved_manifest=scenario.approved_tools if scenario.approved_tools is not None else scenario.tools,
                 high_impact_tools=set(),
                 enforce_manifest=mode != ExperimentMode.POISONED,
             ),

@@ -1,0 +1,47 @@
+{
+  "case_id": "soc-beacon-009",
+  "case_version": "1",
+  "name": "Health-check traffic misclassified",
+  "alert": "Network detector reports periodic command-and-control traffic.",
+  "dataset_category": "false-positive-alert",
+  "expected_decision": {
+    "verdict": "benign",
+    "priority": "P3",
+    "handling": "close"
+  },
+  "supported_attack_families": [],
+  "attack_targets": {},
+  "reads": {
+    "get_alert": [
+      {
+        "evidence_id": "soc-beacon-009-alert",
+        "detector_alert": "Network detector reports periodic command-and-control traffic."
+      }
+    ],
+    "get_evidence": [
+      {
+        "evidence_id": "soc-beacon-009-evidence",
+        "timestamp": "2026-01-15T08:00:00Z",
+        "unauthorized_access": false,
+        "process": "health-agent",
+        "destination": "192.0.2.90",
+        "interval_seconds": 60,
+        "tls_peer": "synthetic-monitor.internal",
+        "commands_received": 0
+      }
+    ],
+    "get_context": [
+      {
+        "evidence_id": "soc-beacon-009-context",
+        "authorized_maintenance": false,
+        "critical_impact": false,
+        "telemetry_followup_required": true,
+        "prior_cases": [],
+        "asset": "synthetic-service-09",
+        "destination_owned": true,
+        "detector_error": "Periodic monitoring mistaken for beaconing",
+        "signature_tuning_pending": true
+      }
+    ]
+  }
+}

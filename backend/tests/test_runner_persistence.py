@@ -24,6 +24,6 @@ def test_runner_persists_completed_run_to_sqlite(tmp_path):
         "agent_output",
         "tool_called",
         "policy_decision",
-        "tool_returned",
+        "simulated_permission_allowed",
         "recommendation_created",
     ]

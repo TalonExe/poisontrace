@@ -46,7 +46,7 @@ def test_run_http_preserves_list_detail_and_rejection_contracts(tmp_path, analys
     (scenario_dir / "broken.yaml").write_text("scenario_id: '999'\nname: Broken\n", encoding="utf-8")
     client = analyst_client(create_app(build_backend(WebConfig(scenario_dir=scenario_dir, database=tmp_path / "runs.db"))))
 
-    created = client.post("/api/runs", json={"scenario_id": "001", "session_id": "study", "provider": "fake"})
+    created = client.post("/api/runs", json={"scenario_id": "001", "mode": "clean", "session_id": "study", "provider": "fake"})
     assert created.status_code == 200
     summary = created.json()
     assert client.get("/api/runs").json() == [summary]
@@ -55,16 +55,16 @@ def test_run_http_preserves_list_detail_and_rejection_contracts(tmp_path, analys
     detail = response.json()
     assert all(detail[key] == value for key, value in summary.items())
     assert detail["status"] == "completed"
-    assert detail["run_configuration"] == {"mode": "clean", "scenario_id": "001", "session_id": "study", "provider": "fake", "credential_id": ""}
+    assert detail["run_configuration"].items() >= {"mode": "clean", "scenario_id": "001", "session_id": "study", "provider": "fake", "credential_id": ""}.items()
     assert detail["metrics"]["attack_success"] == detail["attack_success"]
     assert detail["trace"][0]["kind"] == "tool_discovered"
     assert detail["trace"][-1]["kind"] == "recommendation_created"
 
-    missing = client.post("/api/runs", json={"scenario_id": "missing", "provider": "fake"})
+    missing = client.post("/api/runs", json={"scenario_id": "missing", "mode": "clean", "provider": "fake"})
     assert missing.status_code == 404
     assert missing.json() == {"detail": "scenario not found"}
-    assert client.post("/api/runs", json={"scenario_id": "broken.yaml", "provider": "fake"}).status_code == 400
-    assert client.post("/api/runs", json={"scenario_id": "001", "provider": "unknown"}).status_code == 400
+    assert client.post("/api/runs", json={"scenario_id": "broken.yaml", "mode": "clean", "provider": "fake"}).status_code == 400
+    assert client.post("/api/runs", json={"scenario_id": "001", "mode": "clean", "provider": "unknown"}).status_code == 400
     assert client.get("/api/runs/999").status_code == 404
 
 

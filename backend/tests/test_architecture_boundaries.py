@@ -39,7 +39,7 @@ def test_domain_has_no_application_or_infrastructure_dependencies():
         for name in imports
         if (name.startswith("poisontrace") and not name.startswith("poisontrace.domain."))
         or name.split(".", 1)[0]
-        in {"fastapi", "sqlite3", "yaml", "docker", "openai", "google"}
+        in {"fastapi", "sqlite3", "yaml", "docker", "openai", "google", "mcp"}
     }
     assert not forbidden, f"domain imports forbidden dependencies: {sorted(forbidden)}"
 
@@ -66,13 +66,13 @@ def test_credential_application_and_ports_avoid_concrete_dependencies():
 
 
 def test_run_application_and_runner_avoid_concrete_dependencies():
-    allowed = {"poisontrace.domain"}
-    for name in ("application/runs.py", "application/campaigns.py", "application/execution.py", "application/benchmark.py", "application/gateway.py"):
+    allowed = {"poisontrace.domain", "poisontrace.domain.metrics"}
+    for name in ("application/runs.py", "application/campaigns.py", "application/execution.py", "application/benchmark.py", "application/gateway.py", "application/investigation.py"):
         imports = _python_imports(BACKEND_ROOT / name)
         forbidden = {
             imported for imported in imports
             if (imported.startswith("poisontrace.") and not imported.startswith("poisontrace.application.") and imported not in allowed)
-            or imported.split(".", 1)[0] in {"fastapi", "sqlite3", "yaml", "cryptography", "openai", "google"}
+            or imported.split(".", 1)[0] in {"fastapi", "sqlite3", "yaml", "cryptography", "openai", "google", "mcp"}
         }
         assert not forbidden, f"{name} imports concrete dependencies: {sorted(forbidden)}"
 

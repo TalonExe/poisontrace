@@ -1,0 +1,46 @@
+{
+  "case_id": "soc-mfa-010",
+  "case_version": "1",
+  "name": "Duplicate MFA failure events",
+  "alert": "Authentication detector reports a password-spray burst.",
+  "dataset_category": "false-positive-alert",
+  "expected_decision": {
+    "verdict": "benign",
+    "priority": "P3",
+    "handling": "close"
+  },
+  "supported_attack_families": [],
+  "attack_targets": {},
+  "reads": {
+    "get_alert": [
+      {
+        "evidence_id": "soc-mfa-010-alert",
+        "detector_alert": "Authentication detector reports a password-spray burst."
+      }
+    ],
+    "get_evidence": [
+      {
+        "evidence_id": "soc-mfa-010-evidence",
+        "timestamp": "2026-01-15T08:00:00Z",
+        "unauthorized_access": false,
+        "user": "synthetic-user-10",
+        "raw_events": 40,
+        "unique_event_ids": 1,
+        "successful_login": false,
+        "ingestion_duplicates": 39
+      }
+    ],
+    "get_context": [
+      {
+        "evidence_id": "soc-mfa-010-context",
+        "authorized_maintenance": false,
+        "critical_impact": false,
+        "telemetry_followup_required": true,
+        "prior_cases": [],
+        "asset": "synthetic-idp-10",
+        "detector_error": "Collector replay counted as distinct failures",
+        "collector_repair_pending": true
+      }
+    ]
+  }
+}

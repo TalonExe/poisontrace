@@ -1,0 +1,476 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-12T07:37:32.894599+00:00",
+  "title": "Design System: PoisonTrace",
+  "extensions": {
+    "colorMeta": {
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Canvas",
+        "tonalRamp": [
+          "oklch(15% 0 80)",
+          "oklch(26% 0 80)",
+          "oklch(38% 0 80)",
+          "oklch(49% 0 80)",
+          "oklch(61% 0 80)",
+          "oklch(73% 0 80)",
+          "oklch(85% 0 80)",
+          "oklch(95% 0 80)"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Surface",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(73% 0 0)",
+          "oklch(85% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "surface-raised": {
+        "role": "neutral",
+        "displayName": "Surface raised",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(73% 0 0)",
+          "oklch(85% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "surface-inset": {
+        "role": "neutral",
+        "displayName": "Surface inset",
+        "tonalRamp": [
+          "oklch(15% .015 83)",
+          "oklch(26% .025 83)",
+          "oklch(38% .035 83)",
+          "oklch(49% .045 83)",
+          "oklch(61% .04 83)",
+          "oklch(73% .03 83)",
+          "oklch(85% .02 83)",
+          "oklch(95% .005 83)"
+        ]
+      },
+      "border": {
+        "role": "neutral",
+        "displayName": "Border",
+        "tonalRamp": [
+          "oklch(15% .015 88)",
+          "oklch(26% .025 88)",
+          "oklch(38% .035 88)",
+          "oklch(49% .045 88)",
+          "oklch(61% .04 88)",
+          "oklch(73% .03 88)",
+          "oklch(85% .02 88)",
+          "oklch(95% .005 88)"
+        ]
+      },
+      "border-strong": {
+        "role": "neutral",
+        "displayName": "Border strong",
+        "tonalRamp": [
+          "oklch(15% .015 91)",
+          "oklch(26% .025 91)",
+          "oklch(38% .035 91)",
+          "oklch(49% .045 91)",
+          "oklch(61% .04 91)",
+          "oklch(73% .03 91)",
+          "oklch(85% .02 91)",
+          "oklch(95% .005 91)"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Text",
+        "tonalRamp": [
+          "oklch(15% .015 102)",
+          "oklch(26% .025 102)",
+          "oklch(38% .035 102)",
+          "oklch(49% .045 102)",
+          "oklch(61% .04 102)",
+          "oklch(73% .03 102)",
+          "oklch(85% .02 102)",
+          "oklch(95% .005 102)"
+        ]
+      },
+      "text-muted": {
+        "role": "neutral",
+        "displayName": "Text muted",
+        "tonalRamp": [
+          "oklch(15% .015 96)",
+          "oklch(26% .025 96)",
+          "oklch(38% .035 96)",
+          "oklch(49% .045 96)",
+          "oklch(61% .04 96)",
+          "oklch(73% .03 96)",
+          "oklch(85% .02 96)",
+          "oklch(95% .005 96)"
+        ]
+      },
+      "text-subtle": {
+        "role": "neutral",
+        "displayName": "Text subtle",
+        "tonalRamp": [
+          "oklch(15% .015 98)",
+          "oklch(26% .025 98)",
+          "oklch(38% .035 98)",
+          "oklch(49% .045 98)",
+          "oklch(61% .04 98)",
+          "oklch(73% .03 98)",
+          "oklch(85% .02 98)",
+          "oklch(95% .005 98)"
+        ]
+      },
+      "primary": {
+        "role": "primary",
+        "displayName": "Primary",
+        "tonalRamp": [
+          "oklch(15% .025 310)",
+          "oklch(26% .06 310)",
+          "oklch(38% .10 310)",
+          "oklch(49% .13 310)",
+          "oklch(61% .12 310)",
+          "oklch(73% .09 310)",
+          "oklch(85% .05 310)",
+          "oklch(95% .015 310)"
+        ]
+      },
+      "primary-strong": {
+        "role": "primary",
+        "displayName": "Primary strong",
+        "tonalRamp": [
+          "oklch(15% .015 275)",
+          "oklch(26% .025 275)",
+          "oklch(38% .035 275)",
+          "oklch(49% .045 275)",
+          "oklch(61% .04 275)",
+          "oklch(73% .03 275)",
+          "oklch(85% .02 275)",
+          "oklch(95% .005 275)"
+        ]
+      },
+      "primary-ink": {
+        "role": "primary",
+        "displayName": "Primary ink",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(38% 0 0)",
+          "oklch(49% 0 0)",
+          "oklch(61% 0 0)",
+          "oklch(73% 0 0)",
+          "oklch(85% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "info": {
+        "role": "secondary",
+        "displayName": "Info",
+        "tonalRamp": [
+          "oklch(15% .025 295)",
+          "oklch(26% .06 295)",
+          "oklch(38% .10 295)",
+          "oklch(49% .13 295)",
+          "oklch(61% .12 295)",
+          "oklch(73% .09 295)",
+          "oklch(85% .05 295)",
+          "oklch(95% .015 295)"
+        ]
+      },
+      "info-surface": {
+        "role": "neutral",
+        "displayName": "Info surface",
+        "tonalRamp": [
+          "oklch(15% .015 274)",
+          "oklch(26% .025 274)",
+          "oklch(38% .035 274)",
+          "oklch(49% .045 274)",
+          "oklch(61% .04 274)",
+          "oklch(73% .03 274)",
+          "oklch(85% .02 274)",
+          "oklch(95% .005 274)"
+        ]
+      },
+      "success": {
+        "role": "secondary",
+        "displayName": "Success",
+        "tonalRamp": [
+          "oklch(15% .025 150)",
+          "oklch(26% .06 150)",
+          "oklch(38% .10 150)",
+          "oklch(49% .13 150)",
+          "oklch(61% .12 150)",
+          "oklch(73% .09 150)",
+          "oklch(85% .05 150)",
+          "oklch(95% .015 150)"
+        ]
+      },
+      "success-surface": {
+        "role": "neutral",
+        "displayName": "Success surface",
+        "tonalRamp": [
+          "oklch(15% .015 125)",
+          "oklch(26% .025 125)",
+          "oklch(38% .035 125)",
+          "oklch(49% .045 125)",
+          "oklch(61% .04 125)",
+          "oklch(73% .03 125)",
+          "oklch(85% .02 125)",
+          "oklch(95% .005 125)"
+        ]
+      },
+      "danger": {
+        "role": "secondary",
+        "displayName": "Danger",
+        "tonalRamp": [
+          "oklch(15% .025 20)",
+          "oklch(26% .06 20)",
+          "oklch(38% .10 20)",
+          "oklch(49% .13 20)",
+          "oklch(61% .12 20)",
+          "oklch(73% .09 20)",
+          "oklch(85% .05 20)",
+          "oklch(95% .015 20)"
+        ]
+      },
+      "danger-surface": {
+        "role": "neutral",
+        "displayName": "Danger surface",
+        "tonalRamp": [
+          "oklch(15% .015 348)",
+          "oklch(26% .025 348)",
+          "oklch(38% .035 348)",
+          "oklch(49% .045 348)",
+          "oklch(61% .04 348)",
+          "oklch(73% .03 348)",
+          "oklch(85% .02 348)",
+          "oklch(95% .005 348)"
+        ]
+      },
+      "warning": {
+        "role": "secondary",
+        "displayName": "Warning",
+        "tonalRamp": [
+          "oklch(15% .025 80)",
+          "oklch(26% .06 80)",
+          "oklch(38% .10 80)",
+          "oklch(49% .13 80)",
+          "oklch(61% .12 80)",
+          "oklch(73% .09 80)",
+          "oklch(85% .05 80)",
+          "oklch(95% .015 80)"
+        ]
+      },
+      "warning-surface": {
+        "role": "neutral",
+        "displayName": "Warning surface",
+        "tonalRamp": [
+          "oklch(15% .015 49)",
+          "oklch(26% .025 49)",
+          "oklch(38% .035 49)",
+          "oklch(49% .045 49)",
+          "oklch(61% .04 49)",
+          "oklch(73% .03 49)",
+          "oklch(85% .02 49)",
+          "oklch(95% .005 49)"
+        ]
+      },
+      "focus": {
+        "role": "primary",
+        "displayName": "Focus",
+        "tonalRamp": [
+          "oklch(15% .015 276)",
+          "oklch(26% .025 276)",
+          "oklch(38% .035 276)",
+          "oklch(49% .045 276)",
+          "oklch(61% .04 276)",
+          "oklch(73% .03 276)",
+          "oklch(85% .02 276)",
+          "oklch(95% .005 276)"
+        ]
+      },
+      "rail": {
+        "role": "neutral",
+        "displayName": "Rail",
+        "tonalRamp": [
+          "oklch(15% .025 115)",
+          "oklch(26% .06 115)",
+          "oklch(38% .10 115)",
+          "oklch(49% .13 115)",
+          "oklch(61% .12 115)",
+          "oklch(73% .09 115)",
+          "oklch(85% .05 115)",
+          "oklch(95% .015 115)"
+        ]
+      },
+      "active": {
+        "role": "neutral",
+        "displayName": "Active",
+        "tonalRamp": [
+          "oklch(15% .015 275)",
+          "oklch(26% .025 275)",
+          "oklch(38% .035 275)",
+          "oklch(49% .045 275)",
+          "oklch(61% .04 275)",
+          "oklch(73% .03 275)",
+          "oklch(85% .02 275)",
+          "oklch(95% .005 275)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "headline": {
+        "displayName": "Page heading",
+        "purpose": "Desktop workspace heading."
+      },
+      "headline-mobile": {
+        "displayName": "Narrow heading",
+        "purpose": "Workspace heading at 650px and below."
+      }
+    },
+    "shadows": [
+      {
+        "name": "flat-panel",
+        "value": "none",
+        "purpose": "Working panels and primary actions."
+      }
+    ],
+    "motion": [
+      {
+        "name": "reduced-motion",
+        "value": "animation: none !important; transition: none !important; scroll-behavior: auto !important",
+        "purpose": "Applied under prefers-reduced-motion: reduce."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide",
+        "value": "1600px"
+      },
+      {
+        "name": "compact",
+        "value": "1120px"
+      },
+      {
+        "name": "mobile-navigation",
+        "value": "900px"
+      },
+      {
+        "name": "stacked-setup",
+        "value": "650px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Launches the current valid request.",
+      "html": "<button class=\"ds-primary\">Run experiment</button>",
+      "css": ".ds-primary{font-family:ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;font-size:14px;background:var(--ec-primary);color:var(--ec-primary-ink);border:1px solid var(--ec-primary);border-radius:6px;padding:10px 16px;min-height:40px;font-weight:600;box-shadow:none}.ds-primary:hover{background:var(--ec-primary-strong)}.ds-primary:focus-visible{outline:2px solid var(--ec-focus);outline-offset:3px}.ds-primary:disabled{opacity:.6;cursor:not-allowed}"
+    },
+    {
+      "name": "Text button",
+      "kind": "button",
+      "refersTo": "button-text",
+      "description": "Secondary navigation or disclosure action.",
+      "html": "<button class=\"ds-text\">View results</button>",
+      "css": ".ds-text{font-family:ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;font-size:14px;background:transparent;color:var(--ec-primary);border:0;border-radius:6px;padding:8px 12px;min-height:40px}.ds-text:hover{color:var(--ec-primary-strong)}.ds-text:focus-visible{outline:2px solid var(--ec-focus);outline-offset:3px}"
+    },
+    {
+      "name": "Labeled field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Visible label above a bordered field.",
+      "html": "<label class=\"ds-label\">Configuration name<input class=\"ds-input\" value=\"Synthetic investigation\"></label>",
+      "css": ".ds-label{display:grid;gap:8px;font-family:ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;font-size:14px;color:var(--ec-text-muted)}.ds-input{font-family:ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;font-size:14px;background:var(--ec-surface-raised);color:var(--ec-text);border:1px solid var(--ec-border-strong);border-radius:6px;padding:11px 12px;min-width:0}.ds-input:focus-visible{outline:2px solid var(--ec-focus);outline-offset:4px;box-shadow:none}"
+    },
+    {
+      "name": "History filter",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Composite wrapper owns the keyboard focus outline.",
+      "html": "<label class=\"ds-filter\"><span>Filter</span><input aria-label=\"Filter recorded experiments\" placeholder=\"Search recorded runs\"></label>",
+      "css": ".ds-filter{display:flex;gap:10px;padding:9px 12px;background:var(--ec-surface-raised);border:1px solid var(--ec-border-strong);border-radius:6px;font-family:ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;font-size:14px;color:var(--ec-text-muted)}.ds-filter input{font:inherit;min-width:0;width:100%;border:0;outline:none;background:transparent;color:var(--ec-text)}.ds-filter:focus-within{outline:2px solid var(--ec-focus);outline-offset:3px;box-shadow:none}"
+    },
+    {
+      "name": "Current navigation",
+      "kind": "nav",
+      "refersTo": "navigation-current",
+      "description": "Current destination uses purple fill and marker.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Workspace\"><button aria-current=\"page\">Experiment</button><button>Results</button></nav>",
+      "css": ".ds-nav{display:grid;gap:7px;padding:18px;background:var(--route-rail)}.ds-nav button{font-family:ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;font-size:14px;display:flex;align-items:center;gap:12px;background:transparent;color:var(--ec-text-muted);border:0;border-radius:6px;padding:13px 14px;min-height:46px;text-align:left}.ds-nav button:before{content:\"\";width:7px;height:7px;border:1px solid var(--ec-border-strong);border-radius:50%}.ds-nav button[aria-current]{background:var(--route-active);color:var(--ec-primary);font-weight:650}.ds-nav button[aria-current]:before{background:var(--ec-primary);border-color:var(--ec-primary)}.ds-nav button:hover{background:#dce6cf;color:var(--ec-text)}.ds-nav button:focus-visible{outline:2px solid var(--ec-focus);outline-offset:3px}"
+    },
+    {
+      "name": "Information tag",
+      "kind": "chip",
+      "refersTo": "tag",
+      "description": "A text label for context, not a success claim.",
+      "html": "<span class=\"ds-tag\">Scripted offline</span>",
+      "css": ".ds-tag{font-family:ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;display:inline-block;background:var(--ec-info-surface);color:var(--ec-info);border-radius:5px;padding:4px 8px;font-size:12px}"
+    },
+    {
+      "name": "Working panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Flat bordered container with a readable summary.",
+      "html": "<article class=\"ds-panel\"><h2>Run specification</h2><p>Review the pending request before launch.</p></article>",
+      "css": ".ds-panel{font-family:ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;background:var(--ec-surface);color:var(--ec-text);border:1px solid var(--ec-border);border-radius:12px;padding:26px;box-shadow:none}.ds-panel h2{font-size:23px;line-height:1.35;font-weight:600;margin:0 0 8px}.ds-panel p{font-size:14px;line-height:1.5;color:var(--ec-text-muted);margin:0}"
+    },
+    {
+      "name": "Recorded detail disclosure",
+      "kind": "custom",
+      "refersTo": "panel",
+      "description": "Native disclosure keeps technical detail available without dominating the decision.",
+      "html": "<details class=\"ds-detail\"><summary>Recorded trace</summary><p>Ordered events for this saved attempt.</p></details>",
+      "css": ".ds-detail{font-family:ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif;background:var(--ec-surface);color:var(--ec-text);border:1px solid var(--ec-border);border-radius:12px;padding:22px 26px}.ds-detail summary{cursor:pointer;min-height:44px;font-size:19px;font-weight:600}.ds-detail summary:focus-visible{outline:2px solid var(--ec-focus);outline-offset:3px}.ds-detail[open] summary{margin-bottom:22px}.ds-detail p{font-size:14px;color:var(--ec-text-muted)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Research route",
+    "overview": "PoisonTrace uses white working panels, an olive navigation rail and purple markers for the current task. System sans typography supports repeated setup and saved-evidence review. Conventional controls keep configuration, execution and inspection readable.\n\nThis record describes the verified frontend. The interface uses CSS and inline graphics and requires no raster illustration. Product claims remain limited to synthetic research. Page composition and task-specific direction belong in the brief under `.impeccable/surfaces/`.",
+    "keyCharacteristics": [
+      "White panels and olive navigation separate work from orientation.",
+      "Purple identifies actions, selection and keyboard focus.",
+      "Labels and independent observations explain results before technical detail."
+    ],
+    "rules": [
+      {
+        "name": "The Current Task Rule",
+        "body": "Use purple for the active destination and available task actions. A colored tag alone does not establish a successful investigation.",
+        "section": "colors"
+      },
+      {
+        "name": "The Readable Evidence Rule",
+        "body": "Wrap long IDs and payloads, preserve complete identifiers, and keep technical detail readable when expanded.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Panel Rule",
+        "body": "Separate working regions with borders, space and tonal fills; retain visible focus independently of depth.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use the shared CSS variables for color and preserve the documented import order.",
+      "Do pair state colors with explicit text and keep independent observations separate.",
+      "Do keep complete result IDs, readable wrapped payloads and visible keyboard focus.",
+      "Do keep navigation visible when the rail changes to its mobile layout."
+    ],
+    "donts": [
+      "Don't introduce decorative raster images or ornamental panel shadows into this system.",
+      "Don't collapse unscored, failed or unavailable observations into a success indicator.",
+      "Don't promote legacy literal colors or class-specific overrides into new shared tokens."
+    ]
+  }
+}

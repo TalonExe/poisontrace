@@ -6,7 +6,7 @@ import {
   saveSession,
 } from "../../utils/sessions";
 import { Icon } from "../../components/common/Ui";
-import { AuthenticatedHeader } from "../../components/layout/AuthenticatedHeader";
+import { Sidebar } from "../../components/layout/Sidebar";
 import "../../components/layout/layout.css";
 
 const modelOptions = { gemini: "Gemini API LLM", openai: "OpenAI API LLM" };
@@ -15,6 +15,8 @@ export function SessionWorkspace({
   onOpenSession,
   onSignOut,
   onScenarios,
+  onResults,
+  onDashboard,
   auth,
   user,
   runner = { listCredentials: async () => [] },
@@ -55,9 +57,11 @@ export function SessionWorkspace({
   const saveDraft = (event) => {
     event.preventDefault();
     if (!draft.name.trim()) return;
-    setSessions((current) => current.some((session) => session.id === draft.id)
-      ? saveSession(current, draft)
-      : [{ ...draft, name: draft.name.trim() }, ...current]);
+    setSessions((current) =>
+      current.some((session) => session.id === draft.id)
+        ? saveSession(current, draft)
+        : [{ ...draft, name: draft.name.trim() }, ...current],
+    );
     if (draft.name.trim()) {
       setEditing(null);
       setDraft(null);
@@ -65,7 +69,12 @@ export function SessionWorkspace({
   };
   const removeSession = (id) => {
     const session = sessions.find((item) => item.id === id);
-    if (!window.confirm(`Delete session "${session?.name}"? Its configuration will be removed from this browser.`)) return;
+    if (
+      !window.confirm(
+        `Delete configuration "${session?.name}"? Its configuration will be removed from this browser.`,
+      )
+    )
+      return;
     setSessions((current) => deleteSession(current, id));
     if (editing === id) {
       setEditing(null);
@@ -115,19 +124,26 @@ export function SessionWorkspace({
   };
   return (
     <main className="session-shell">
-      <AuthenticatedHeader
+      <Sidebar
+        active="sessions"
         user={user}
         auth={auth}
         onSignedOut={onSignOut}
-        subtitle="Session workspace"
+        onSessions={() => {}}
+        onDashboard={onDashboard}
+        onResults={onResults}
+        onScenarios={onScenarios}
       />
       <section className="session-heading">
         <div>
-          <h1>Choose a session</h1>
-          <p>Save provider and credential settings for repeated experiments. Scenarios are selected in the experiment workspace.</p>
+          <h1>Configurations</h1>
+          <p>
+            Reusable provider settings for your experiments. Select the case and
+            condition in Experiment; revisit saved attempts in Results.
+          </p>
         </div>
         <button className="run-button" onClick={beginCreate}>
-          New session <Icon name="arrow" size={14} />
+          New configuration <Icon name="arrow" size={14} />
         </button>
       </section>
       <section className="session-layout">
@@ -136,7 +152,8 @@ export function SessionWorkspace({
             <div>
               <p className="label">Saved configurations</p>
               <h2>
-                {sessions.length} session{sessions.length === 1 ? "" : "s"}
+                {sessions.length} saved configuration
+                {sessions.length === 1 ? "" : "s"}
               </h2>
             </div>
           </div>
@@ -144,16 +161,13 @@ export function SessionWorkspace({
             <article
               className={`session-row ${editing === session.id ? "selected" : ""}`}
               key={session.id}
-
             >
               <div className="session-mark">
                 {session.model === "gemini" ? "G" : "O"}
               </div>
               <div className="session-summary">
                 <strong>{session.name}</strong>
-                <small>
-                  {modelOptions[session.model]}
-                </small>
+                <small>{modelOptions[session.model]}</small>
                 <small>Updated {session.updated}</small>
               </div>
               <button
@@ -182,7 +196,7 @@ export function SessionWorkspace({
                   removeSession(session.id);
                 }}
               >
-                ×
+                <Icon name="trash" size={16} />
               </button>
             </article>
           ))}
@@ -191,11 +205,11 @@ export function SessionWorkspace({
           <form className="card session-editor" onSubmit={saveDraft}>
             <div className="card-head">
               <div>
-                <p className="label">Session settings</p>
+                <p className="label">Provider settings</p>
                 <h2>
                   {editing && sessions.some((session) => session.id === editing)
-                    ? "Edit session"
-                    : "New session"}
+                    ? "Edit configuration"
+                    : "New configuration"}
                 </h2>
               </div>
               <button
@@ -207,11 +221,11 @@ export function SessionWorkspace({
                   setDraft(null);
                 }}
               >
-                ×
+                <Icon name="close" size={16} />
               </button>
             </div>
             <label className="field">
-              <span>Session name</span>
+              <span>Configuration name</span>
               <input
                 value={draft.name}
                 onChange={(event) =>
@@ -221,8 +235,8 @@ export function SessionWorkspace({
                 required
               />
             </label>
-            <label className="field">
-              <span>Model provider</span>
+            <fieldset className="field provider-field">
+              <legend>Model provider</legend>
               <div className="model-options">
                 {Object.entries(modelOptions).map(([value, label]) => (
                   <button
@@ -230,7 +244,9 @@ export function SessionWorkspace({
                     key={value}
                     className={`model-option ${draft.model === value ? "active" : ""}`}
                     aria-pressed={draft.model === value}
-                    onClick={() => setDraft({ ...draft, model: value, credentialId: "" })}
+                    onClick={() =>
+                      setDraft({ ...draft, model: value, credentialId: "" })
+                    }
                   >
                     <strong>{value === "gemini" ? "G" : "O"}</strong>
                     <span>{label}</span>
@@ -242,7 +258,7 @@ export function SessionWorkspace({
                   </button>
                 ))}
               </div>
-            </label>
+            </fieldset>
             <label className="field">
               <span>API credential reference</span>
               <div className="select-wrap">
@@ -343,19 +359,19 @@ export function SessionWorkspace({
               browser session data.
             </p>
             <button className="run-button save-session">
-              Save session <Icon name="arrow" size={14} />
+              Save configuration <Icon name="arrow" size={14} />
             </button>
           </form>
         ) : (
           <div className="session-empty">
             <span className="logo">P</span>
-            <h2>Open a session to start</h2>
+            <h2>Choose settings for your next experiment</h2>
             <p>
-              Open an existing configuration or create a new one before running
-              a simulation.
+              Open a saved configuration or create one. Your experiment history
+              is available in Results independently of these settings.
             </p>
             <button className="small-button" onClick={beginCreate}>
-              Create a session <Icon name="arrow" size={12} />
+              Create a configuration <Icon name="arrow" size={12} />
             </button>
           </div>
         )}

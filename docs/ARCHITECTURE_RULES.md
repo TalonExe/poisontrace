@@ -35,3 +35,9 @@ Current after compatibility retirement, 2026-11-03. ARCHITECTURE.md is the sourc
 backend/tests/test_architecture_boundaries.py inspects imports and construction placement, including retired imports in tests and source. backend/tests/test_imports.py exercises isolated optional-dependency-free imports. Behavioral tests cover use cases, storage, scenarios, secrets and HTTP roles.
 
 These checks do not establish owner isolation, atomic campaign claims, saved-run identity, campaign eligibility, durable recovery, public-profile enforcement or deployment readiness. Preserve ADR 0001 identity/repair, ADR 0002 account/role restrictions and ADR 0003 public/local requirements. Browser investigation configurations are not auth sessions.
+
+
+Slice one, 2026-11-11: application use cases may import domain.metrics for pure aggregation. Return the saved run ID from execution; never infer associations from globally latest records. Keep nullable current outcomes and legacy versions explicit. Post-completion gateway permission is simulated and must not be described as external tool execution. Read research/SLICE_ONE_MEASUREMENTS.md before changing formulas.
+
+
+Ticket #21, 2026-11-11: application/investigation.py coordinates the bounded evidence loop through application-owned model, case and transport ports. MCP SDK, subprocess lifecycle and JSON Schema validation stay in adapters/mcp/. ToolGateway.invoke_evidence checks qualified read-only calls; ToolGateway.invoke remains simulation for metadata history. Preserve their separate provenance. Scripted investigation inputs exclude expected labels and complete fixture contents. investigation-unscored-v1 is not recommendation-v1 scoring, and read-only invocation is not manifest-defense effectiveness.

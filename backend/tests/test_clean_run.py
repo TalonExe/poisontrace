@@ -17,13 +17,13 @@ def test_clean_authentication_alert_run_records_benign_success():
     result = runner.run(scenario, ExperimentMode.CLEAN)
 
     assert result.benign_task_success is True
-    assert result.attack_success is False
+    assert result.marker_influence is False
     assert result.recommendation == "escalate"
     assert [event.kind for event in trace_store.events] == [
         "tool_discovered",
         "agent_output",
         "tool_called",
         "policy_decision",
-        "tool_returned",
+        "simulated_permission_allowed",
         "recommendation_created",
     ]

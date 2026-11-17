@@ -3,11 +3,14 @@
 from typing import Literal, NotRequired, TypedDict
 
 
-Provider = Literal["fake", "gemini", "openai"]
+Provider = Literal["fake", "gemini", "openai", "scripted"]
 RunMode = Literal["clean", "poisoned", "defended"]
 
 
 class RunRequest(TypedDict, total=False):
+    attack_family: str
+    workflow: str
+    case_id: str
     session_id: str
     scenario_id: str
     mode: RunMode
@@ -17,6 +20,25 @@ class RunRequest(TypedDict, total=False):
 
 
 class RunResponse(TypedDict):
+    investigation_scores: dict | None
+    workflow: str
+    system_error: bool
+    status: str
+    error_category: str | None
+    defense_evidence_version: str
+    manifest_check_performed: bool | None
+    definition_mismatch: bool | None
+    call_rejected: bool | None
+    policy_reason: str | None
+    proposed_tool_name: str | None
+    clean_call_legitimate: bool | None
+    gateway_simulated: bool | None
+    scoring_version: str
+    marker_influence: bool | None
+    attacker_goal_achievement: bool | None
+    recommendation_correctness: bool | None
+    expected_recommendation: str | None
+    attacker_target_recommendation: str | None
     id: str
     run_id: int
     scenario_id: str
@@ -32,8 +54,8 @@ class RunResponse(TypedDict):
 
 
 class RunMetrics(TypedDict):
-    attack_success: bool
-    benign_task_success: bool
+    attack_success: bool | None
+    benign_task_success: bool | None
     execution_time_ms: float
     injection_verdict: str
     task_outcome: str
@@ -42,16 +64,17 @@ class RunMetrics(TypedDict):
 
 class RunTraceEvent(TypedDict):
     kind: str
-    data: dict[str, str]
+    data: dict[str, object]
 
 
 class RunDetailResponse(RunResponse):
-    status: str
+    investigation: dict | None
+    condition_version: str
+    model_facing_definitions: list[dict[str, object]] | None
     recommendation: str
-    benign_task_success: bool
-    attack_success: bool
+    benign_task_success: bool | None
+    attack_success: bool | None
     execution_time_ms: float
-    system_error: bool
     unauthorised_tool_call: bool
     run_configuration: dict[str, str]
     trace: list[RunTraceEvent]

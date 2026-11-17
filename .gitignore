@@ -19,3 +19,6 @@ frontend/test-results/
 *.egg-info/
 /test-results/
 /tmp/
+
+# Local versioned research ground-truth overrides
+/investigation-cases/

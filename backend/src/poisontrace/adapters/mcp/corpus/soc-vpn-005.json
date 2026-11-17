@@ -1,0 +1,45 @@
+{
+  "case_id": "soc-vpn-005",
+  "case_version": "1",
+  "name": "Approved travel VPN login",
+  "alert": "New-country authentication from a corporate VPN.",
+  "dataset_category": "benign-activity",
+  "expected_decision": {
+    "verdict": "benign",
+    "priority": "P4",
+    "handling": "close"
+  },
+  "supported_attack_families": [],
+  "attack_targets": {},
+  "reads": {
+    "get_alert": [
+      {
+        "evidence_id": "soc-vpn-005-alert",
+        "detector_alert": "New-country authentication from a corporate VPN."
+      }
+    ],
+    "get_evidence": [
+      {
+        "evidence_id": "soc-vpn-005-evidence",
+        "timestamp": "2026-01-15T08:00:00Z",
+        "unauthorized_access": false,
+        "user": "synthetic-traveller-05",
+        "mfa_passed": true,
+        "source_ip": "192.0.2.50",
+        "device_certificate_valid": true
+      }
+    ],
+    "get_context": [
+      {
+        "evidence_id": "soc-vpn-005-context",
+        "authorized_maintenance": true,
+        "critical_impact": false,
+        "telemetry_followup_required": false,
+        "prior_cases": [],
+        "asset": "synthetic-laptop-05",
+        "travel_approval": "TRV-005",
+        "vpn_egress_confirmed": true
+      }
+    ]
+  }
+}

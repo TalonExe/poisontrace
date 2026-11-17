@@ -1,16 +1,33 @@
 import { test, expect } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
-  await page.addInitScript(() => localStorage.clear());
+  let authenticated = false;
+  await page.route(
+    (url) => url.pathname.startsWith("/api/"),
+    async (route) => {
+      const path = new URL(route.request().url()).pathname;
+      if (path === "/api/auth/login") authenticated = true;
+      const data = path.startsWith("/api/auth/")
+        ? {
+            user: authenticated
+              ? { username: "analyst", role: "analyst", redirect: "/sessions" }
+              : null,
+          }
+        : path === "/api/scenarios"
+          ? [{ scenario_id: "002", name: "Synthetic case", valid: true }]
+          : [];
+      await route.fulfill({ json: data });
+    },
+  );
   await page.goto("/");
 });
 
 async function signIn(page) {
-  await page.getByLabel("Analyst ID").fill("analyst");
+  await page.getByLabel("Username").fill("analyst");
   await page.getByLabel("Local passcode").fill("synthetic-only");
-  await page.getByRole("button", { name: /Open dashboard/ }).click();
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Choose a session." }),
+    page.getByRole("heading", { name: "Configurations" }),
   ).toBeVisible();
 }
 
@@ -23,14 +40,14 @@ test("session workspace creates a session and selects a provider", async ({
   page,
 }) => {
   await signIn(page);
-  await page.getByRole("button", { name: /New session/ }).click();
-  await page.getByLabel("Session name").fill("OpenAI browser study");
+  await page.getByRole("button", { name: /New configuration/ }).click();
+  await page.getByLabel("Configuration name").fill("OpenAI browser study");
   const openAiOption = page.getByRole("button", {
     name: /OpenAI API LLM gpt-5-mini/,
   });
   await openAiOption.click();
   await expect(openAiOption).toHaveClass(/active/);
-  await page.getByRole("button", { name: /Save session/ }).click();
+  await page.getByRole("button", { name: /Save configuration/ }).click();
   await expect(page.getByText("OpenAI browser study")).toBeVisible();
 });
 
@@ -38,14 +55,15 @@ test("sidebar navigates to scenarios and back to sessions", async ({
   page,
 }) => {
   await signIn(page);
-  await page.getByRole("button", { name: "Open navigation" }).click();
   await page.getByRole("button", { name: /Scenarios/ }).click();
   await expect(
-    page.getByRole("heading", { name: "Manage scenarios." }),
+    page.getByRole("heading", { name: "Scenario library" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Return to sessions" }).click();
+  await page
+    .getByRole("button", { name: "Configurations", exact: true })
+    .click();
   await expect(
-    page.getByRole("heading", { name: "Choose a session." }),
+    page.getByRole("heading", { name: "Configurations" }),
   ).toBeVisible();
 });
 

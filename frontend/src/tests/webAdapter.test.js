@@ -192,3 +192,20 @@ test("surfaces backend failures instead of creating local demo runs", async () =
     /Runner API unavailable/,
   );
 });
+
+test("MCP investigations forward only the selected provider configuration", async () => {
+  const calls = [];
+  const adapter = createRunnerAdapter({fetchImpl: async (...args) => { calls.push(args); return response({run_id: 17}); }});
+  await adapter.runInvestigation({caseId: "soc-auth-001", provider: "gemini", model: "chosen-gemini", credentialId: "ref-1"});
+  assert.deepEqual(JSON.parse(calls[0][1].body), {workflow: "mcp-investigation-v1", case_id: "soc-auth-001", session_id: "", mode: "clean", provider: "gemini", model: "chosen-gemini", credential_id: "ref-1"});
+  await adapter.runInvestigation({caseId: "soc-auth-001", credentialId: "must-not-forward"});
+  assert.equal(JSON.parse(calls[1][1].body).credential_id, undefined);
+});
+
+test("OpenAI investigation forwards the actual model and credential reference", async () => {
+  let sent;
+  const adapter = createRunnerAdapter({fetchImpl: async (url, options) => { sent = JSON.parse(options.body); return response({run_id: 19}); }});
+  await adapter.runInvestigation({caseId:"soc-auth-001",provider:"openai",model:"gpt-5-mini",credentialId:"test-ref"});
+  assert.equal(sent.model,"gpt-5-mini");
+  assert.equal(sent.credential_id,"test-ref");
+});

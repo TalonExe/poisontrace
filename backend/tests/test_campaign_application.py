@@ -47,20 +47,24 @@ def test_campaign_interface_owns_selection_execution_details_and_reruns(campaign
     assert service.get(cid) == created
     assert calls == []
     executed = service.execute(cid)
-    assert (executed["completed"], executed["failed"], executed["attack_successes"]) == (2, 0, 2)
-    assert calls == [("openai", "chosen", "synthetic-key")]
+    assert (executed["completed"], executed["failed"], executed["attack_successes"]) == (2, 0, 0)
+    assert calls == [("openai", "chosen", "synthetic-key")] * 2
     detail = service.get(cid)
     for item in detail["scenarios"]:
         rid = item["child_run_id"]
         assert item["trace"] == [{"kind": e.kind, "data": e.data} for e in store.events_for(rid)]
-        assert store.result_for(rid).run_configuration == {"campaign_id": cid, "provider": "openai", "credential_id": "ref", "model": "chosen", "mode": "poisoned", "scenario_id": "002"}
-        assert item["outcome"] == "Attack success"
+        assert store.result_for(rid).run_configuration.items() >= {"campaign_id": cid, "provider": "openai", "credential_id": "ref", "model": "chosen", "mode": "poisoned", "scenario_id": "002"}.items()
+        assert item["outcome"] == "Marker observed"
     old_id = detail["scenarios"][0]["child_run_id"]
     rerun = service.rerun(cid, 0)
     assert rerun["scenarios"][0]["child_run_id"] != old_id
-    assert calls == [("openai", "chosen", "synthetic-key")] * 2
+    assert calls == [("openai", "chosen", "synthetic-key")] * 3
     assert "synthetic-key" not in str(rerun)
-    assert service.list()[0]["completed"] == 2
+    summary = service.list()[0]
+    assert summary["completed"] == 2
+    assert summary["metrics"]["attempted"] == 3
+    assert summary["metrics"]["by_condition"]["poisoned"]["attacker_goal"]["value"] is None
+    assert summary["metrics"]["by_condition"]["poisoned"]["marker_influence"]["denominator"] == 3
     with pytest.raises(ValueError, match="already completed"):
         service.execute(cid)
     with pytest.raises(KeyError):
@@ -92,7 +96,29 @@ def test_campaign_failures_repair_and_credential_revalidation(campaign_dependenc
     repaired = service.rerun(cid, 0)
     assert repaired["status"] == "completed_with_errors"
     assert repaired["scenarios"][0]["error"] is None
-    assert repaired["scenarios"][0]["outcome"] == "Attack success"
+    assert repaired["scenarios"][0]["outcome"] == "Marker observed"
     assert service.list()[0]["failed"] == 0
     campaigns.associate_child_run(cid, 0, child_run_id=99999)
     assert service.get(cid)["scenarios"][0]["failure_state"] == "missing_child_run"
+
+def test_campaign_retains_provider_failures_and_uses_returned_ids(campaign_dependencies):
+    service, campaigns, store, directory, calls, secrets = campaign_dependencies
+    def fail(*args): raise RuntimeError('synthetic-secret provider body')
+    from poisontrace.application.runs import RunApplicationService
+    from poisontrace.adapters.scenarios.loader import CampaignScenarioFiles
+    service = CampaignApplicationService(campaigns, store, CampaignScenarioFiles(directory), fail, RunApplicationService(store, None, None).summary)
+    created = service.create({'provider': 'fake'})
+    cid = created['campaign_id']
+    executed = service.execute(cid)
+    assert (executed['completed'], executed['failed']) == (0, 2)
+    detail = service.get(cid)
+    assert len(store.run_ids()) == 2
+    for child in detail['scenarios']:
+        assert child['child_run_id'] is not None
+        assert child['status'] == 'failed'
+        assert child['marker_influence'] is None
+        assert child['trace'][-1]['kind'] == 'experiment_failed'
+    assert 'synthetic-secret' not in str(detail)
+    assert service.list()[0]['completed'] == 0
+    assert service.list()[0]['metrics']['system_error_rate'] == 1
+    assert service.list()[0]['metrics']['by_condition']['poisoned']['attacker_goal']['value'] is None

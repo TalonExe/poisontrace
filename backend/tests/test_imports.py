@@ -8,7 +8,7 @@ import pytest
 
 @pytest.mark.parametrize("imports", [
     "from poisontrace.adapters.models.fake import FakeModel",
-    "from poisontrace.domain.metrics import calculate_metrics; assert calculate_metrics([]).attack_success_rate == 0",
+    "from poisontrace.domain.metrics import calculate_metrics; assert calculate_metrics([]).attack_success_rate is None",
     "from poisontrace.application.accounts import UserSessionService; assert UserSessionService.normalize_username(' Mixed ') == 'mixed'",
     "from poisontrace.application.runs import RunApplicationService; from poisontrace.application.campaigns import CampaignApplicationService",
 ])

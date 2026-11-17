@@ -26,6 +26,8 @@ def create_app(backend, *, auth_service: UserSessionService):
         if user.role != "analyst":
             return JSONResponse({"detail": "Forbidden"}, status_code=403)
         return await call_next(request)
+    from poisontrace.interfaces.http.routers import run_groups
+    app.include_router(run_groups.create_router(backend.groups))
     app.include_router(runs.create_router(backend.runs))
     app.include_router(scenarios.create_router(backend.scenario_service))
     app.include_router(campaigns.create_router(backend.campaign_service))

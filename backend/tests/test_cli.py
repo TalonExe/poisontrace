@@ -1,5 +1,4 @@
 from poisontrace.interfaces.cli import main
-from poisontrace.interfaces import cli
 
 
 def test_cli_runs_yaml_scenario(capsys):
@@ -13,7 +12,7 @@ def test_cli_runs_poisoned_yaml_scenario(capsys):
     exit_code = main(["run", "backend/tests/fixtures/scenarios/authentication-alert-poisoned-002.yaml", "--mode", "poisoned"])
 
     assert exit_code == 0
-    assert "benign_success=False" in capsys.readouterr().out
+    assert "recommendation_correctness=True" in capsys.readouterr().out
 
 
 def test_cli_benchmarks_yaml_scenario(capsys):
@@ -31,10 +30,10 @@ def test_cli_benchmarks_yaml_scenario(capsys):
     output = capsys.readouterr().out
     assert exit_code == 0
     assert "runs=4" in output
-    assert "attack_success_rate=0.00" in output
-    # The gateway blocks execution, but cannot erase the marker already emitted by FakeModel.
-    assert "benign_task_success_rate=0.00" in output
-    assert "defence_blocking_rate=0.00" in output
+    assert "attacker_goal=Not applicable (0/0)" in output
+    # Output influence and recommendation correctness coexist with simulated call rejection.
+    assert "recommendation_correctness=1.00 (4/4)" in output
+    assert "call_rejection=1.00 (4/4)" in output
 
 
 def test_cli_defaults_to_fake_model(capsys):
@@ -68,9 +67,12 @@ def test_cli_exact_output_and_argument_errors(capsys):
     import pytest
     scenario = "backend/tests/fixtures/scenarios/authentication-alert-001.yaml"
     assert main(["run", scenario]) == 0
-    assert capsys.readouterr().out == "001: mode=clean benign_success=True attack_success=False\n"
+    assert capsys.readouterr().out == "001: mode=clean status=completed marker_influence=False attacker_goal=Unscored recommendation_correctness=True\n"
     assert main(["benchmark", scenario, "--repeated-runs", "0"]) == 0
-    assert capsys.readouterr().out == "001: mode=clean runs=1 attack_success_rate=0.00 benign_task_success_rate=1.00 defence_blocking_rate=0.00 false_positive_rate=0.00\n"
+    output = capsys.readouterr().out
+    assert "runs=1 completed=1 failed=0 legacy=0 unscored=0" in output
+    assert "attacker_goal=Not applicable (0/0)" in output
+    assert "inappropriate_clean_block=0.00 (0/1)" in output
     with pytest.raises(ValueError, match="repeated_runs must not be negative"):
         main(["benchmark", scenario, "--repeated-runs", "-1"])
     for arguments in (["run", scenario, "--model", "unknown"], ["run", scenario, "--mode", "unknown"], []):
@@ -79,14 +81,29 @@ def test_cli_exact_output_and_argument_errors(capsys):
         assert error.value.code == 2
 
 
-def test_cli_gemini_diagnostic_output_is_preserved(monkeypatch, capsys):
+def test_cli_does_not_print_sensitive_provider_diagnostics(monkeypatch, capsys):
     from poisontrace import bootstrap
     from poisontrace.adapters.models.fake import FakeModel
     class OfflineGemini(FakeModel):
         raw_response = "synthetic diagnostic"
         def __init__(self, model_name):
             self.model_name = model_name
-    monkeypatch.setattr(cli, "GeminiModel", OfflineGemini)
     monkeypatch.setattr(bootstrap, "GeminiModel", OfflineGemini)
     assert main(["run", "backend/tests/fixtures/scenarios/authentication-alert-001.yaml", "--model", "gemini-3.5-flash-lite"]) == 0
-    assert capsys.readouterr().out == "gemini_raw_response=synthetic diagnostic\n001: mode=clean benign_success=True attack_success=False\n"
+    assert capsys.readouterr().out == "001: mode=clean status=completed marker_influence=False attacker_goal=Unscored recommendation_correctness=True\n"
+
+def test_cli_failures_are_unscored_and_return_nonzero(monkeypatch, capsys):
+    from poisontrace.interfaces import cli
+    class Failed:
+        def respond(self, scenario, tools): raise RuntimeError('synthetic-secret')
+    monkeypatch.setattr(cli, 'build_cli_model', lambda name: Failed())
+    scenario = 'backend/tests/fixtures/scenarios/authentication-alert-001.yaml'
+    assert main(['run', scenario]) == 1
+    output = capsys.readouterr().out
+    assert 'status=failed' in output
+    assert 'attacker_goal=Unscored' in output
+    assert 'synthetic-secret' not in output
+    assert main(['benchmark', scenario, '--repeated-runs', '0']) == 1
+    output = capsys.readouterr().out
+    assert 'system_error=1.00 (1/1)' in output
+    assert 'recommendation_correctness=Not applicable (0/0)' in output

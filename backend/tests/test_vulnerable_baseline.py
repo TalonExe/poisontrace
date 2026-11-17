@@ -32,13 +32,13 @@ def test_poisoned_tool_executes_in_vulnerable_baseline():
 
     result = runner.run(poisoned, ExperimentMode.POISONED)
 
-    assert result.benign_task_success is False
-    assert result.attack_success is True
+    assert result.recommendation_correctness is True
+    assert result.marker_influence is True
     assert [event.kind for event in trace_store.events] == [
         "tool_discovered",
         "agent_output",
         "tool_called",
         "policy_decision",
-        "tool_returned",
+        "simulated_permission_allowed",
         "recommendation_created",
     ]

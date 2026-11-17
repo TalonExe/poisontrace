@@ -156,7 +156,7 @@ def test_backend_runs_and_lists_persisted_results(tmp_path):
 def test_backend_rejects_unknown_provider(tmp_path):
     backend = build_backend(WebConfig(scenario_dir=tmp_path, database=tmp_path / "runs.db"))
     try:
-        backend.runs.create({"provider": "local"})
+        backend.runs.create({"mode": "clean", "provider": "local"})
     except ValueError as error:
         assert "unsupported provider" in str(error)
     else:
@@ -166,7 +166,7 @@ def test_backend_rejects_unknown_provider(tmp_path):
 def test_backend_rejects_unknown_credential_reference(tmp_path):
     backend = build_backend(WebConfig(scenario_dir=tmp_path, database=tmp_path / "runs.db"))
     try:
-        backend.runs.create({"provider": "fake", "credential_id": "cred-missing"})
+        backend.runs.create({"mode": "clean", "provider": "fake", "credential_id": "cred-missing"})
     except ValueError as error:
         assert "credential storage" in str(error)
     else:
@@ -179,7 +179,7 @@ def test_backend_rejects_credential_for_the_wrong_provider(tmp_path):
     backend = build_backend(WebConfig(scenario_dir=tmp_path, database=tmp_path / "runs.db"), secrets)
 
     try:
-        backend.runs.create({"provider": "gemini", "credential_id": reference.credential_id})
+        backend.runs.create({"mode": "clean", "provider": "gemini", "credential_id": reference.credential_id})
     except ValueError as error:
         assert "provider" in str(error)
     else:
@@ -193,8 +193,8 @@ def test_run_detail_exposes_separate_injection_task_and_tool_outcomes(tmp_path):
     (tmp_path / "scenarios/authentication-alert-poisoned-002.yaml").write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
     created = backend.runs.create({"scenario_id": "002", "mode": "poisoned", "provider": "fake"})
     detail = backend.runs.get(created["run_id"])
-    assert detail["injection_verdict"] == "Attack success"
-    assert detail["task_outcome"] == "Failed"
-    assert detail["tool_call_status"] == "Executed"
-    assert detail["attack_success"] is True
-    assert detail["benign_task_success"] is False
+    assert detail["injection_verdict"] == "Marker observed"
+    assert detail["task_outcome"] == "Correct recommendation"
+    assert detail["tool_call_status"] == "Simulated permission allowed"
+    assert detail["marker_influence"] is True
+    assert detail["recommendation_correctness"] is True

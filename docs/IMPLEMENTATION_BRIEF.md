@@ -6,6 +6,12 @@ The first release is a local, containerised benchmark for one SOC authentication
 
 Current distribution decision, 2026-11-03: ADR 0003 adds a public demonstration with live models and analyst-supplied API keys alongside the open-source local edition. Public accounts are issued by the operator, keys/history are private, scenarios are curated and read-only, and provider keys remain encrypted until revoked. These are requirements awaiting implementation, not current hosting capabilities. DEPLOYMENT_REVIEW.md lists launch prerequisites. The historical open questions and frontend build notes below predate backend authentication and the redesign; ADRs and current STATUS take precedence.
 
+## Current execution scope, 2026-11-11
+
+Slice one implements matched metadata selection and corrected measurement. In Metadata experiment, the model returns one recommendation before the gateway's simulated permission decision. That workflow executes no external MCP tool and retrieves no evidence. The intended core flow below remains a research commitment, not a description of completed capability. The research objectives have not been revised. See [measurement contract](research/SLICE_ONE_MEASUREMENTS.md).
+
+Ticket #21 adds one clean real-MCP investigation using a scripted offline model, actual alert/evidence/context reads and persisted structured decisions. Tickets #22 and #23 add Gemini and OpenAI evidence continuation with offline SDK-substitute verification. Ticket #24 adds controlled two-server attack mechanics with offline substitutes. Ticket #25 adds the manifest defense with offline implementation verification. No live-provider effectiveness has been measured. New investigation-scoring-v1 records keep field correctness, explicit goals, raw marker availability, reference validation and actual policy observations separate; historical records retain their meanings. The bounded target is SCOPE_REFINEMENT.md, not every historical promise below. See [clean MCP implementation](research/CLEAN_MCP_INVESTIGATION.md). The historical flow and build-order notes below do not expand the accepted read-only scope.
+
 ## Core flow
 
 - The analyst signs in through a local prototype login page before entering the dashboard.
@@ -58,3 +64,11 @@ The scenario concerns a suspicious authentication event. The agent retrieves the
 ## Next frontend slice
 
 Build the login page and local authentication seam before connecting the dashboard to a web API. The page should match the dark Evidence Control system, identify the workspace as synthetic, support loading and invalid-credential states, and redirect authenticated users to the dashboard. Do not add real credential storage.
+
+## Fifteen-case corpus, ticket #27, 2026-11-12
+
+The bounded corpus is now implemented locally. Five benign activities, five false-positive alerts and five malicious incidents are selectable through the MCP launcher, with deterministic evidence and P1-P4 ground truth. Both retained families are allocated to the five malicious incidents; the other ten are clean controls. The existing explanation field carries detailed recommendations while new handling values are exactly close/escalate under canonical-handling-v2. See research/SYNTHETIC_RESEARCH_CORPUS.md for the rubric, coverage, saved revisions and offline verification. #28 remains the next software slice for matched groups/repeats/comparisons. No live evaluation has occurred.
+
+The subsequent user-authorized payload revision replaces the active v1 descriptions with fixed v2 SOC reconciliation/connector compatibility pretexts grounded in primary MCP poisoning research. It preserves the two families, cases, attacker goals, read-only operations and manifest-only defense. Exact archives and unmeasured effectiveness are documented in research/MCP_PAYLOAD_REVISION_V2.md; no live call or paid comparison is authorized by this revision.
+
+Ticket #28 adds explicit matched investigation groups, repeats, retained reruns and compatible Results comparisons. The immutable plan pins case/evidence/targets, payload, provider/model, prompts/settings, definitions and scoring versions. Dashboard configures execution; Results reports independent condition-specific rates, missing/unavailable values, failures and individual evidence links. Historical campaigns remain separate. See research/MATCHED_RUN_GROUPS.md for contracts and request-bound execution limits.

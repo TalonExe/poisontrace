@@ -273,6 +273,11 @@ export function ScenarioEditor({
           />
         </label>
         <label className="field">
+          <span>Attacker target recommendation (optional)</span>
+          <input value={draft.attacker_target_recommendation ?? ""} onChange={(event) => update("attacker_target_recommendation", event.target.value || null)} />
+          <small>Exact structured value, distinct from the expected recommendation. Leave empty for marker-only smoke cases; attacker goal remains unscored.</small>
+        </label>
+        <label className="field">
           <span>Expected recommendation</span>
           <input
             value={draft.expected_recommendation || ""}

@@ -5,3 +5,4 @@ import { App } from "./app/App";
 
 createRoot(document.getElementById("root")).render(<App />);
 import "./redesign.css";
+import "./research-route.css";

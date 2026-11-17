@@ -16,7 +16,7 @@ class ProtectedActionModel:
         return AgentDecision(ToolCall("disable_account", {"account_id": "acct-001"}), "escalate")
 
 
-@pytest.mark.parametrize("actor,success", [(None, False), ("cli-analyst", True)])
+@pytest.mark.parametrize("actor,success", [(None, True), ("cli-analyst", True)])
 def test_cli_runner_applies_protected_tool_approval(actor, success):
     scenario = load_scenario(Path("backend/tests/fixtures/scenarios/protected-action-004.yaml"))
     calls = []
@@ -29,11 +29,11 @@ def test_cli_runner_applies_protected_tool_approval(actor, success):
     assert calls == ["fake"]
 
 
-@pytest.mark.parametrize("mode,tool_status", [(ExperimentMode.POISONED, "Executed"), (ExperimentMode.DEFENDED, "Blocked")])
+@pytest.mark.parametrize("mode,tool_status", [(ExperimentMode.POISONED, "Simulated permission allowed"), (ExperimentMode.DEFENDED, "Rejected proposed call")])
 def test_cli_runner_preserves_manifest_policy(mode, tool_status):
     scenario = load_scenario(Path("backend/tests/fixtures/scenarios/authentication-alert-poisoned-002.yaml"))
     result = build_cli_runner(scenario, mode).run(scenario, mode)
-    assert result.attack_success
+    assert result.marker_influence
     assert result.tool_call_status == tool_status
 
 
@@ -55,7 +55,7 @@ def test_cli_benchmark_preserves_empty_high_impact_policy_and_fresh_trials():
     assert first.trace_store.events == second.trace_store.events == []
     with pytest.raises(ValueError, match="repeated_runs must not be negative"):
         benchmark.run(scenario, ExperimentMode.CLEAN, -1)
-    assert len(models) == 6
+    assert len(models) == 4
 
 
 def test_cli_model_selection_preserves_supported_names_and_environment_key_fallback(monkeypatch):
@@ -98,7 +98,9 @@ runpy.run_module("poisontrace", run_name="__main__")
     result = subprocess.run([sys.executable, "-c", script, command, scenario], cwd=tmp_path, env=environment, capture_output=True, text=True, timeout=15)
     assert result.returncode == 0, result.stderr
     if command == "run":
-        assert result.stdout == "001: mode=clean benign_success=True attack_success=False\n"
+        assert result.stdout == "001: mode=clean status=completed marker_influence=False attacker_goal=Unscored recommendation_correctness=True\n"
     else:
-        assert result.stdout == "001: mode=clean runs=4 attack_success_rate=0.00 benign_task_success_rate=1.00 defence_blocking_rate=0.00 false_positive_rate=0.00\n"
+        assert "runs=4 completed=4 failed=0 legacy=0 unscored=0" in result.stdout
+        assert "attacker_goal=Not applicable (0/0)" in result.stdout
+        assert "system_error=0.00 (0/4)" in result.stdout
     assert list(tmp_path.iterdir()) == []

@@ -1,3 +1,4 @@
+from dataclasses import replace
 """Durable shared-schema contracts for persistence adapters."""
 import sqlite3
 
@@ -34,7 +35,7 @@ def test_shared_schema_reopens_existing_data_and_child_associations(tmp_path, fi
     assert reopened["scenarios"][0]["error"] == "ValueError"
     assert reopened["scenarios"][1]["child_run_id"] == run_id
     assert reopened["status"] == "completed_with_errors"
-    assert SqliteTraceStore(database).result_for(run_id) == result
+    assert SqliteTraceStore(database).result_for(run_id) == replace(result, run_id=run_id)
     assert [event.kind for event in traces.events_for(run_id)] == ["first", "second"]
     with sqlite3.connect(database) as connection:
         assert connection.execute("SELECT token_hash FROM auth_sessions").fetchall() == [("synthetic-token",)]

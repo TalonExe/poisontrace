@@ -25,9 +25,9 @@ def run_dependencies(tmp_path):
 
 
 @pytest.mark.parametrize("scenario_id,mode,verdict,tool_status", [
-    ("001", "clean", "Blocked", "Executed"),
-    ("002", "poisoned", "Attack success", "Executed"),
-    ("002", "defended", "Attack success", "Blocked"),
+    ("001", "clean", "Marker not observed", "Simulated permission allowed"),
+    ("002", "poisoned", "Marker observed", "Simulated permission allowed"),
+    ("002", "defended", "Marker observed", "Rejected proposed call"),
 ])
 def test_run_module_creates_lists_and_reads_persisted_evidence(run_dependencies, scenario_id, mode, verdict, tool_status):
     store, scenarios = run_dependencies
@@ -63,21 +63,21 @@ def test_run_module_supplies_only_the_selected_key_to_injected_model(run_depende
         return FakeModel()
 
     runs = RunApplicationService(store, scenarios, model_factory, secrets)
-    created = runs.create({"scenario_id": "001", "provider": "openai", "model": "chosen-model", "credential_id": reference.credential_id})
+    created = runs.create({"scenario_id": "001", "mode": "clean", "provider": "openai", "model": "chosen-model", "credential_id": reference.credential_id})
     assert calls == [("openai", "chosen-model", "synthetic-provider-key")]
     detail = runs.get(created["run_id"])
     assert detail["run_configuration"]["credential_id"] == reference.credential_id
     assert "synthetic-provider-key" not in str(detail)
     with pytest.raises(ValueError, match="does not match run provider"):
-        runs.create({"scenario_id": "001", "provider": "gemini", "credential_id": reference.credential_id})
+        runs.create({"scenario_id": "001", "mode": "clean", "provider": "gemini", "credential_id": reference.credential_id})
     assert len(calls) == 1
 
 
 @pytest.mark.parametrize("payload,error", [
-    ({"scenario_id": "001", "provider": "unknown"}, ValueError),
+    ({"scenario_id": "001", "mode": "clean", "provider": "unknown"}, ValueError),
     ({"scenario_id": "001", "mode": "unknown"}, ValueError),
-    ({"scenario_id": "missing", "provider": "fake"}, KeyError),
-    ({"scenario_id": "broken.yaml", "provider": "fake"}, ValueError),
+    ({"scenario_id": "missing", "mode": "clean", "provider": "fake"}, KeyError),
+    ({"scenario_id": "broken.yaml", "mode": "clean", "provider": "fake"}, ValueError),
 ])
 def test_rejected_runs_do_not_construct_models_or_persist_results(run_dependencies, payload, error):
     store, scenarios = run_dependencies
@@ -89,3 +89,43 @@ def test_rejected_runs_do_not_construct_models_or_persist_results(run_dependenci
     with pytest.raises(error):
         runs.create(payload)
     assert store.run_ids() == []
+
+def test_run_condition_is_required_and_definitions_are_exposed(run_dependencies):
+    store, scenarios = run_dependencies
+    runs = RunApplicationService(store, scenarios, lambda *args: FakeModel())
+    with pytest.raises(ValueError, match='condition'):
+        runs.create({'scenario_id': '002', 'provider': 'fake'})
+    created = runs.create({'scenario_id': '002', 'mode': 'clean'})
+    detail = runs.get(created['run_id'])
+    assert detail['model_facing_definitions'] == [{'name': 'get_authentication_alert', 'description': 'Retrieve the authentication alert.'}]
+    assert detail['condition_version'] == 'matched-v1'
+
+def test_scenario_attack_target_validation_and_api_outcomes(run_dependencies):
+    store, scenarios = run_dependencies
+    item = scenarios.get('002')
+    document = {**item['document'], 'attacker_target_recommendation': 'close'}
+    scenarios.update('002', document)
+    runs = RunApplicationService(store, scenarios, lambda *args: FakeModel())
+    created = runs.create({'scenario_id': '002', 'mode': 'poisoned'})
+    detail = runs.get(created['run_id'])
+    assert detail['marker_influence'] is True
+    assert detail['attacker_goal_achievement'] is False
+    assert detail['recommendation_correctness'] is True
+    assert detail['scoring_version'] == 'recommendation-v1'
+    assert created['attacker_goal_achievement'] is False
+    for target in ['', 'escalate', 42]:
+        with pytest.raises(ValueError, match='attacker target'):
+            scenarios.update('002', {**document, 'attacker_target_recommendation': target})
+    assert scenarios.load_usable('002').attacker_target_recommendation == 'close'
+
+def test_explicit_empty_manifest_is_never_replaced_with_attacked_definitions(run_dependencies):
+    store, scenarios = run_dependencies
+    document = {**scenarios.get('002')['document'], 'approved_tools': []}
+    scenarios.update('002', document)
+    runs = RunApplicationService(store, scenarios, lambda *args: FakeModel())
+    defended = runs.create({'scenario_id': '002', 'mode': 'defended'})
+    assert defended['call_rejected'] is True
+    assert defended['definition_mismatch'] is True
+    with pytest.raises(ValueError, match='condition requires'):
+        runs.create({'scenario_id': '002', 'mode': 'clean'})
+    assert len(store.run_ids()) == 1

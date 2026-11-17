@@ -1,0 +1,46 @@
+{
+  "case_id": "soc-scan-004",
+  "case_version": "1",
+  "name": "Authorized vulnerability assessment",
+  "alert": "Internal host connects to many service ports.",
+  "dataset_category": "benign-activity",
+  "expected_decision": {
+    "verdict": "benign",
+    "priority": "P3",
+    "handling": "close"
+  },
+  "supported_attack_families": [],
+  "attack_targets": {},
+  "reads": {
+    "get_alert": [
+      {
+        "evidence_id": "soc-scan-004-alert",
+        "detector_alert": "Internal host connects to many service ports."
+      }
+    ],
+    "get_evidence": [
+      {
+        "evidence_id": "soc-scan-004-evidence",
+        "timestamp": "2026-01-15T08:00:00Z",
+        "unauthorized_access": false,
+        "source_ip": "192.0.2.40",
+        "destination": "198.51.100.4",
+        "ports_scanned": 120,
+        "scanner_identity": "synthetic-assessor"
+      }
+    ],
+    "get_context": [
+      {
+        "evidence_id": "soc-scan-004-context",
+        "authorized_maintenance": true,
+        "critical_impact": false,
+        "telemetry_followup_required": true,
+        "prior_cases": [],
+        "asset": "synthetic-lab-04",
+        "change_ticket": "CHG-004",
+        "assessment_authorized": true,
+        "inventory_tag_missing": true
+      }
+    ]
+  }
+}

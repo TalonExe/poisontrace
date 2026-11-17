@@ -1,5 +1,8 @@
 # Research objectives review
 
+Implementation note, 2026-11-11: approved slice-one corrections are documented in [slice-one measurements](research/SLICE_ONE_MEASUREMENTS.md). This review remains a dated assessment of the pre-slice system; its historical evidence and overall objective verdicts are not rewritten. The report objectives remain unchanged.
+
+
 Reviewed 2026-11-10 against the current working tree, including untracked canonical source. No application changes or live-provider calls were made. Existing work and local experiment records were preserved.
 
 ## Assessment

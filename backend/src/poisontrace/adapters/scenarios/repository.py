@@ -68,6 +68,11 @@ class YamlScenarioRepository:
         raise KeyError(scenario_id)
 
     def _validate(self, document: dict[str, Any]) -> None:
+        target = document.get("attacker_target_recommendation")
+        if target is not None and (not isinstance(target, str) or not target.strip() or target != target.strip()):
+            raise ValueError("attacker target recommendation must be a nonempty exact value or null")
+        if target is not None and target == document.get("expected_recommendation"):
+            raise ValueError("attacker target recommendation must differ from legitimate recommendation")
         if not document.get("name", "").strip(): raise ValueError("name is required")
         if not re.fullmatch(r"\d{3}", str(document.get("scenario_id", ""))): raise ValueError("scenario_id must be a three-digit identifier")
         if not isinstance(document.get("tools"), list) or not document["tools"]: raise ValueError("scenario must contain at least one tool")
