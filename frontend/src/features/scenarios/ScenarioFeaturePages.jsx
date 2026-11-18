@@ -54,7 +54,7 @@ export function ScenarioLibrary({
       <section className="welcome">
         <div>
           <h1>Scenario library</h1>
-          <p>Only valid scenarios can be used for runs and campaigns.</p>
+          <p>YAML metadata scenarios for metadata runs and campaigns. Only valid scenarios can be used.</p>
         </div>
         <div>
           <button className="run-button" onClick={onNew}>

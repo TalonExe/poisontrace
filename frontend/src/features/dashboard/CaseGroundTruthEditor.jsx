@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-export function CaseGroundTruthEditor({runner, caseId, disabled, onSaved}) {
+export function CaseGroundTruthEditor({runner, caseId, disabled, onSaved, onPendingChange}) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState(null);
   const [targets, setTargets] = useState("{}");
@@ -10,6 +10,7 @@ export function CaseGroundTruthEditor({runner, caseId, disabled, onSaved}) {
   useEffect(() => {
     if (!open || !caseId) return;
     let active = true;
+    setData(null); setMessage("");
     setPending(true); setError("");
     runner.getInvestigationCase(caseId).then(value => {
       if (active) { setData(value); setTargets(JSON.stringify(value.attack_targets || {}, null, 2)); }
@@ -21,14 +22,14 @@ export function CaseGroundTruthEditor({runner, caseId, disabled, onSaved}) {
     event.preventDefault(); setError(""); setMessage("");
     let predicates;
     try {predicates = JSON.parse(targets);} catch {setError("Attack predicates must be valid JSON."); return;}
-    setPending(true);
+    setPending(true); onPendingChange?.(true);
     try {
       const value = await runner.updateInvestigationCase(caseId, {base_version:data.case_version, expected_decision:data.expected_decision, dataset_category:data.dataset_category, attack_targets:predicates});
       setData(value); setMessage(`Saved case version ${value.case_version}.`); onSaved(value);
-    } catch(e) {setError(e.message);} finally {setPending(false);}
+    } catch(e) {setError(e.message);} finally {setPending(false); onPendingChange?.(false);}
   }
   return <section aria-label="Case ground truth">
-    <button type="button" className="text-button" disabled={disabled || !caseId} aria-expanded={open} onClick={()=>setOpen(!open)}>{open ? "Close case ground truth" : "Edit case ground truth"}</button>
+    <button type="button" className="text-button" disabled={pending || disabled || !caseId} aria-expanded={open} onClick={()=>setOpen(!open)}>{open ? "Close case ground truth" : "Edit case ground truth"}</button>
     {open && <>
       <p>Ground truth stays outside model and MCP inputs. Saving creates a new case version and preserves earlier results. Evidence remains unchanged.</p>
       {pending && <p role="status">Loading or saving case ground truth…</p>}

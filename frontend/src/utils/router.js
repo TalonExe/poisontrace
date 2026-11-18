@@ -12,6 +12,10 @@ import { Outlet } from "@tanstack/react-router";
 export const routes = Object.freeze({
   login: "/login",
   dashboard: "/dashboard",
+  researchCases: "/research-cases",
+  single: "/dashboard/single",
+  metadata: "/dashboard/metadata",
+  metadataCampaign: "/dashboard/campaign",
   results: "/results",
   resultRuns: "/results/runs",
   resultGroups: "/results/groups",

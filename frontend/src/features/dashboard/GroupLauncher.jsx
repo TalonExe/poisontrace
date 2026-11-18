@@ -1,17 +1,23 @@
+import { ExecutionSelection } from "./ExecutionSelection";
+import {
+  executionModels as models,
+  resolveExecution,
+} from "../../utils/executionSelection";
 import React, { useEffect, useState } from "react";
 
-const models = {
-  scripted: "scripted-soc-v2",
-  gemini: "gemini-3.5-flash-lite",
-  openai: "gpt-5-mini",
-};
 const conditions = ["clean", "poisoned", "defended"];
 
-export function GroupLauncher({ runner, session, onResults, onRunningChange }) {
+export function GroupLauncher({
+  runner,
+  selection,
+  onSelectionChange,
+  executionOptions,
+  onResults,
+  onRunningChange,
+}) {
   const [cases, setCases] = useState([]);
   const [groups, setGroups] = useState([]);
   const [caseId, setCaseId] = useState("");
-  const [provider, setProvider] = useState("scripted");
   const [family, setFamily] = useState("cross-server-shadowing");
   const [schedule, setSchedule] = useState(conditions);
   const [repeats, setRepeats] = useState("1");
@@ -44,10 +50,15 @@ export function GroupLauncher({ runner, session, onResults, onRunningChange }) {
   const saved = groups.find((g) => g.group_id === groupId);
   const selected = cases.find((c) => c.case_id === caseId);
   const allocated = Boolean(selected?.attacks?.length);
-  const actualProvider = saved?.plan.provider || provider;
-  const validCredential =
-    actualProvider === "scripted" ||
-    (session.model === actualProvider && Boolean(session.credentialId));
+  const execution = resolveExecution(
+    selection,
+    executionOptions.configurations,
+    executionOptions.credentials,
+    saved?.plan,
+  );
+  const provider = execution.provider;
+  const actualProvider = provider;
+  const validCredential = execution.valid;
   const count = saved
     ? saved.plan.repeats * saved.plan.conditions.length
     : Number(repeats) * schedule.length;
@@ -60,6 +71,7 @@ export function GroupLauncher({ runner, session, onResults, onRunningChange }) {
       (!schedule.some((c) => c !== "clean") || allocated));
   async function launch(event) {
     event.preventDefault();
+    if (!valid || !validCredential) return;
     setRunning(true);
     onRunningChange(true);
     setError("");
@@ -67,14 +79,14 @@ export function GroupLauncher({ runner, session, onResults, onRunningChange }) {
       const credential =
         actualProvider === "scripted"
           ? {}
-          : { credential_id: session.credentialId };
+          : { credential_id: execution.credentialId };
       const group = saved
         ? await runner.executeRunGroup(groupId, credential)
         : await runner.createRunGroup({
             case_id: caseId,
             case_version: selected.case_version,
             provider,
-            ...(provider === "scripted" ? {} : { model: models[provider] }),
+            ...(provider === "scripted" ? {} : { model: execution.model }),
             ...credential,
             conditions: schedule,
             repeats: Number(repeats),
@@ -128,6 +140,13 @@ export function GroupLauncher({ runner, session, onResults, onRunningChange }) {
               ))}
             </select>
           </label>
+          <ExecutionSelection
+            selection={selection}
+            onChange={onSelectionChange}
+            options={executionOptions}
+            required={saved?.plan}
+            disabled={running || loading}
+          />
           {!saved && (
             <>
               <label className="field">
@@ -150,17 +169,6 @@ export function GroupLauncher({ runner, session, onResults, onRunningChange }) {
                 </select>
               </label>
               {!loading && !cases.length && <p>No research cases available.</p>}
-              <label className="field">
-                Group provider
-                <select
-                  value={provider}
-                  onChange={(e) => setProvider(e.target.value)}
-                >
-                  <option value="scripted">Scripted offline</option>
-                  <option value="gemini">Gemini</option>
-                  <option value="openai">OpenAI</option>
-                </select>
-              </label>
               <fieldset className="condition-schedule">
                 <legend>Condition schedule</legend>
                 <p>Execution order follows the list below, once per repeat.</p>
@@ -260,7 +268,7 @@ export function GroupLauncher({ runner, session, onResults, onRunningChange }) {
             {actualProvider === "scripted"
               ? "No key used"
               : validCredential
-                ? "Selected configuration's private reference"
+                ? "Selected execution's private reference"
                 : "Matching provider credential required"}
           </dd>
         </dl>
@@ -273,8 +281,8 @@ export function GroupLauncher({ runner, session, onResults, onRunningChange }) {
         )}
         {!validCredential && (
           <p role="status">
-            Choose a configuration with a {actualProvider} credential before
-            running.
+            Select a matching configuration above or reload execution options
+            before running.
           </p>
         )}
         <button

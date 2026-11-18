@@ -40,12 +40,24 @@ export function Sidebar({
         >
           Results
         </button>
-        <button
-          aria-current={active === "scenarios" ? "page" : undefined}
-          onClick={onScenarios}
-        >
-          Scenarios
-        </button>
+        <details className="advanced-navigation">
+          <summary>Advanced</summary>
+          <button aria-current={active === "research-cases" ? "page" : undefined} onClick={() => onDashboard("/research-cases")}>
+            MCP research case authoring
+          </button>
+          <button onClick={() => onDashboard("/dashboard/metadata")}>
+            Metadata experiments
+          </button>
+          <button onClick={() => onDashboard("/dashboard/campaign")}>
+            Metadata campaigns
+          </button>
+          <button
+            aria-current={active === "scenarios" ? "page" : undefined}
+            onClick={onScenarios}
+          >
+            Metadata scenarios (YAML)
+          </button>
+        </details>
       </nav>
     </div>
   );

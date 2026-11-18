@@ -1,5 +1,9 @@
 # Next-session handoff: finish the bounded PoisonTrace research core
 
+Current direction, 2026-11-18: the user cancelled #29-#31 as not needed and requested publication of the current cleanup work. Start the next session with [NEXT_SESSION_HANDOFF_DEPLOYMENT.md](NEXT_SESSION_HANDOFF_DEPLOYMENT.md) to assess deployment options and readiness. This supersedes every research next-ticket instruction and copyable prompt below. Historical verification and preservation notes remain valid. No deployment or provider spend is authorized.
+
+Current task override, 2026-11-17: application cleanup #32-#37 is complete locally and uncommitted on cleanup/bounded-research-workflow. Read [NEXT_SESSION_HANDOFF_CLEANUP.md](NEXT_SESSION_HANDOFF_CLEANUP.md) for the latest verified outcome and preservation rules. The next research frontier remains #29 for a later request after refreshing its full issue/comments and actual prerequisites. No #29 or live evaluation was started during cleanup. The research contracts below remain reference material.
+
 Prepared 2026-11-11 after direct PDF audit, scope confirmation and approved ticket publication. This supersedes NEXT_SESSION_HANDOFF_RESEARCH_REVIEW.md as the entry point for future core planning/implementation. The old handoff and audit remain historical evidence.
 
 ## Overall Results indicator, 2026-11-17

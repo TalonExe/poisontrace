@@ -60,6 +60,15 @@ def test_clean_control_rerun_keeps_original_case_snapshot_and_prior_attempt(tmp_
     created=client.post('/api/run-groups',json=request).json()
     edited=backend.runs.investigation_case('soc-backup-002')
     backend.runs.update_investigation_case('soc-backup-002',dict(base_version='1',expected_decision=dict(verdict='malicious',priority='P2',handling='escalate'),dataset_category=edited['dataset_category'],attack_targets={}))
+    # Current catalog and new groups use the revision; old setup is rejected.
+    catalog=client.get('/api/runs/investigation-cases').json()
+    assert next(item for item in catalog if item['case_id']=='soc-backup-002')['case_version']=='2'
+    assert client.post('/api/run-groups',json=request).status_code==400
+    fresh=client.post('/api/run-groups',json={**request,'case_version':'2'})
+    assert fresh.status_code==200,fresh.text
+    assert fresh.json()['plan']['case']['case_version']=='2'
+    fresh_run=backend.runs.get(fresh.json()['attempts'][0]['run_id'])
+    assert fresh_run['investigation']['scores']['decision_correctness'] is False
     rerun=client.post('/api/run-groups/'+created['group_id']+'/execute',json={})
     assert rerun.status_code==200,rerun.text
     group=rerun.json()

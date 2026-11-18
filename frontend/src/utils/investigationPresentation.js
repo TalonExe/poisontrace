@@ -3,7 +3,16 @@ export function investigationMeasurementPresentation(key, rate) {
   if (!rate?.denominator) return { tone: "unavailable" };
   const yes = rate.numerator;
   const no = rate.denominator - yes;
-  if (key.endsWith("_correctness") || key === "evidence_references_valid") {
+  if (key === "evidence_references_valid") {
+    return {
+      tone: no ? "negative" : "positive",
+      positiveText: `${yes} with references found`,
+      negativeText: `${no} with invalid or missing references`,
+      positiveCount: yes,
+      negativeCount: no,
+    };
+  }
+  if (key.endsWith("_correctness")) {
     return {
       tone: no ? "negative" : "positive",
       positiveText: `${yes} correct`,

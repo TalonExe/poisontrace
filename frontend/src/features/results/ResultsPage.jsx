@@ -110,7 +110,7 @@ export function ResultsPage({
         onSignedOut={onSignOut}
         onSessions={onSessions}
         onDashboard={onDashboard}
-        onResults={() => onNavigate("/results")}
+        onResults={() => onNavigate("/results/groups")}
         onScenarios={onScenarios}
       />
       <section className="welcome">
@@ -126,10 +126,10 @@ export function ResultsPage({
       </section>
       <nav className="execution-mode" aria-label="Results views">
         {[
+          ["groups", "Groups", "/results/groups"],
           ["overview", "Overview", "/results"],
           ["runs", "Runs", "/results/runs"],
           ["campaigns", "Campaigns", "/results/campaigns"],
-          ["groups", "Groups", "/results/groups"],
         ].map(([id, label, target]) => (
           <button
             key={id}
@@ -160,7 +160,7 @@ export function ResultsPage({
             !error && (
               <>
                 <p>
-                  These rates describe saved attempts across cases and models.
+                  Historical analysis: these pooled rates describe saved attempts across cases and models.
                   They are not matched same-case comparisons.
                 </p>
                 <InvestigationMeasurements metrics={metrics?.investigations} />
@@ -219,8 +219,9 @@ export function ResultsPage({
                         {run.id} · {run.mode}
                       </strong>
                       <small>
-                        {outcomePresentation(run).injection} ·{" "}
-                        {outcomePresentation(run).task}
+                        {["investigation-scoring-v1", "investigation-unscored-v1"].includes(run.scoring_version)
+                          ? `${outcomePresentation(run).task} · ${outcomePresentation(run).attacker} · ${run.status || "Status unavailable"}`
+                          : `${outcomePresentation(run).injection} · ${outcomePresentation(run).task}`}
                       </small>
                     </span>
                   </button>

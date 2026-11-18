@@ -18,14 +18,14 @@ export function InvestigationMeasurements({ metrics }) {
         ["priority_correctness", "Priority correctness"],
         ["handling_correctness", "Handling correctness"],
         ["decision_correctness", "All decision fields"],
-        ["attacker_goal", "Attacker goal"],
-        ["marker_influence", "Raw-output marker"],
+        ["attacker_goal", "Attacker-target matches"],
       ],
     ],
     [
-      "Observed checks",
+      "Policy, marker and reference observations",
       [
-        ["evidence_references_valid", "Reference validity"],
+        ["evidence_references_valid", "Evidence-reference membership"],
+        ["marker_influence", "Raw-output marker"],
         ["discovery_restriction", "Discovery restriction"],
         ["invocation_rejection", "Invocation rejection"],
       ],
@@ -87,8 +87,8 @@ export function InvestigationMeasurements({ metrics }) {
         <p>
           Decision and marker rates use completed investigation-scoring-v1
           records with available outcomes. Clean or missing attacker targets are
-          not applicable. Reference validity includes observed final candidates
-          with rejected references. It does not verify all reasoning.
+          not applicable. Evidence-reference membership includes observed final candidates
+          with rejected references. Membership in returned evidence does not establish that the explanation is true. Target matches do not establish injection causation.
         </p>
         <p>
           Policy rates include failed attempts only where the corresponding

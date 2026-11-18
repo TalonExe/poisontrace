@@ -55,7 +55,8 @@ test("sidebar navigates to scenarios and back to sessions", async ({
   page,
 }) => {
   await signIn(page);
-  await page.getByRole("button", { name: /Scenarios/ }).click();
+  await page.locator(".workspace-navigation summary").click();
+  await page.getByRole("button", { name: "Metadata scenarios (YAML)", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Scenario library" }),
   ).toBeVisible();

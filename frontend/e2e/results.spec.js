@@ -52,7 +52,7 @@ test("Dashboard launches a run and opens its returned identifier on Results", as
   page,
 }) => {
   await fixture(page);
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/metadata");
   await expect(
     page.getByRole("heading", { name: "Recorded experiments" }),
   ).toHaveCount(0);
@@ -94,7 +94,7 @@ test("Dashboard shows pending execution and preserves configuration after a reje
     });
   });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/metadata");
   await page
     .getByRole("combobox", { name: "Mode", exact: true })
     .selectOption("Clean");
@@ -108,13 +108,13 @@ test("Dashboard shows pending execution and preserves configuration after a reje
     page.getByRole("combobox", { name: "Mode", exact: true }),
   ).toBeDisabled();
   await expect(
-    page.getByRole("button", { name: "Batch campaign", exact: true }),
+    page.getByRole("button", { name: "Single run", exact: true }),
   ).toBeDisabled();
   release();
   await expect(page.getByRole("alert")).toContainText(
     "Scenario is no longer usable",
   );
-  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page).toHaveURL(/\/dashboard\/metadata$/);
   await expect(
     page.getByRole("combobox", { name: "Mode", exact: true }),
   ).toHaveValue("Clean");
@@ -173,7 +173,7 @@ test("a failed saved attempt opens by returned ID and keeps unscored outcomes", 
       ],
     }),
   });
-  await page.goto("/dashboard");
+  await page.goto("/dashboard/metadata");
   await page.getByRole("button", { name: "Run new experiment" }).click();
   await expect(page).toHaveURL(/\/results\/runs\/7$/);
   await expect(page.locator(".outcome")).toContainText("Failed attempt");
@@ -203,10 +203,8 @@ test("Results works without a saved session and preserves selection on refresh a
     "true",
   );
   await page.locator(".trace > summary").click();
-  await page.getByRole("button", { name: "Open full trace" }).click();
-  await expect(
-    page.getByRole("region", { name: "Trace inspection" }),
-  ).toContainText("Recommendation 2");
+  await expect(page.locator(".trace .timeline pre")).toContainText('"value": "Recommendation 2"');
+  await expect(page.getByRole("button", { name: "Open full trace" })).toHaveCount(0);
 });
 
 test("Results retains legacy and empty states on mobile with keyboard navigation", async ({
@@ -298,10 +296,9 @@ test("campaign execution opens its own saved campaign and child run", async ({
           : campaign,
     });
   });
-  await page.goto("/dashboard");
-  await page
-    .getByRole("button", { name: "Batch campaign", exact: true })
-    .click();
+  await page.goto("/dashboard/metadata");
+  await page.locator(".workspace-navigation summary").click();
+  await page.getByRole("button", { name: "Metadata campaigns", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Campaign history" }),
   ).toHaveCount(0);

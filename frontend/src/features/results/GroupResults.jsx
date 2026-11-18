@@ -2,15 +2,19 @@ import { InvestigationRate, OutcomeLegend } from "./InvestigationRate";
 import { groupPerformance } from "../../utils/investigationPresentation";
 import React, { useEffect, useState } from "react";
 
-const metrics = [
+const decisionMetrics = [
   ["verdict_correctness", "Verdict correct"],
   ["priority_correctness", "Priority correct"],
   ["handling_correctness", "Handling correct"],
   ["decision_correctness", "All decision fields correct"],
-  ["attacker_goal", "Attacker goal achieved"],
+  ["attacker_goal", "Attacker-target matches"],
+];
+const observationMetrics = [
   ["discovery_restriction", "Discovery restriction observed"],
   ["invocation_rejection", "Invocation rejection observed"],
   ["marker_influence", "Raw marker observed"],
+];
+const executionMetrics = [
   ["system_error", "System error, compatible attempts"],
 ];
 function rate(value) {
@@ -53,6 +57,28 @@ export function GroupResults({ runner, groupId, onNavigate, onDashboard }) {
   const comparison = group?.comparison;
   const performance = groupPerformance(comparison);
   const modes = ["clean", "poisoned", "defended"];
+  const metricRows = (items) => (
+    <>
+      {items.map(([key, label]) => (
+        <tr key={key}>
+          <th scope="row">{label}</th>
+          {modes.map((c) => {
+            const row = comparison.by_condition[c];
+            return (
+              <td key={c}>
+                <InvestigationRate
+                  measure={key}
+                  value={row[key]}
+                  label={rate(row[key])}
+                />
+                <small>{row.unavailable[key]} unavailable</small>
+              </td>
+            );
+          })}
+        </tr>
+      ))}
+    </>
+  );
   return (
     <section className="group-results">
       <article className="card">
@@ -195,34 +221,31 @@ export function GroupResults({ runner, groupId, onNavigate, onDashboard }) {
               {comparison.not_requested_conditions.join(", ")}.
             </p>
           )}
-          <p>
-            Rates show observed positives / eligible attempts. Failed decisions
-            stay unavailable. Policy rates use actual checks, including checks
-            before a failure. No-check and disabled enforcement are unavailable.
-          </p>
-          <OutcomeLegend />
+          <h3>Decision outcomes</h3>
           <p className="group-scroll-hint">
-            Scroll the table horizontally to review all conditions on a narrow
-            screen. Keyboard users can focus the table and use the arrow keys.
+            Scroll each table horizontally on a narrow screen. Keyboard users
+            can focus the table and use the arrow keys.
           </p>
-          <div
-            className="group-table-scroll"
-            role="region"
-            aria-label="Condition comparison"
-            tabIndex={0}
-          >
-            <table className="group-table">
-              <thead>
-                <tr>
-                  <th scope="col">Measurement</th>
-                  {modes.map((c) => (
-                    <th scope="col" key={c}>
-                      {c}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
+          <section aria-label="Condition comparison">
+            <ComparisonTable title="Decision outcomes" modes={modes}>
+              {metricRows(decisionMetrics)}
+            </ComparisonTable>
+            <details>
+              <summary>Policy and marker observations</summary>
+              <p>
+                Restrictions and rejections do not establish a correct decision.
+                Marker absence does not establish a correct investigation.
+              </p>
+              <ComparisonTable
+                title="Policy and marker observations"
+                modes={modes}
+              >
+                {metricRows(observationMetrics)}
+              </ComparisonTable>
+            </details>
+            <details>
+              <summary>Execution accounting</summary>
+              <ComparisonTable title="Execution accounting" modes={modes}>
                 {[
                   ["Requested per execution", (row) => row.requested],
                   ["Scheduled, including reruns", (row) => row.scheduled],
@@ -239,24 +262,7 @@ export function GroupResults({ runner, groupId, onNavigate, onDashboard }) {
                     ))}
                   </tr>
                 ))}
-                {metrics.map(([key, label]) => (
-                  <tr key={key}>
-                    <th scope="row">{label}</th>
-                    {modes.map((c) => {
-                      const row = comparison.by_condition[c];
-                      return (
-                        <td key={c}>
-                          <InvestigationRate
-                            measure={key}
-                            value={row[key]}
-                            label={rate(row[key])}
-                          />
-                          <small>{row.unavailable[key]} unavailable</small>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
+                {metricRows(executionMetrics)}
                 <tr>
                   <th scope="row">Mean duration, compatible attempts</th>
                   {modes.map((c) => {
@@ -285,9 +291,19 @@ export function GroupResults({ runner, groupId, onNavigate, onDashboard }) {
                     </td>
                   ))}
                 </tr>
-              </tbody>
-            </table>
-          </div>
+              </ComparisonTable>
+            </details>
+          </section>
+          <details>
+            <summary>Measurement definitions and colors</summary>
+            <p>
+              Rates show observed positives / eligible attempts. Failed
+              decisions stay unavailable. Policy rates use actual checks,
+              including checks before a failure. No-check and disabled
+              enforcement are unavailable.
+            </p>
+            <OutcomeLegend />
+          </details>
           {comparison.excluded_attempts.length > 0 && (
             <section aria-label="Incompatible attempts">
               <h3>Excluded from matched rates</h3>
@@ -343,5 +359,30 @@ export function GroupResults({ runner, groupId, onNavigate, onDashboard }) {
         </article>
       )}
     </section>
+  );
+}
+
+function ComparisonTable({ title, modes, children }) {
+  return (
+    <div
+      className="group-table-scroll"
+      role="region"
+      aria-label={title}
+      tabIndex={0}
+    >
+      <table className="group-table">
+        <thead>
+          <tr>
+            <th scope="col">Measurement</th>
+            {modes.map((c) => (
+              <th scope="col" key={c}>
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
+    </div>
   );
 }

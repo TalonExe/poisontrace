@@ -2,7 +2,7 @@ export function outcomePresentation(run = {}) {
   if (run.scoring_version === "investigation-scoring-v1") {
     const scores = run.investigation?.scores || run.investigation_scores || {};
     const label = (value, yes, no) => value == null ? "Unscored" : value ? yes : no;
-    return {injection:label(scores.marker_influence,"Marker observed","Marker not observed"), attacker:label(scores.attacker_goal,"Achieved","Not achieved"),
+    return {injection:label(scores.marker_influence,"Marker observed","Marker not observed"), attacker:label(scores.attacker_goal,"Target matched","No target match"),
       task:label(scores.decision_correctness,"Decision fields correct","Decision fields incorrect"), defense:"See recorded manifest observations",
       tool:run.tool_call_status || "Unavailable", system:run.status === "failed" || run.system_error ? "System/model failure" : "No system/model failure"};
   }

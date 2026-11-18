@@ -35,3 +35,10 @@ test('never infers rejection from marker absence and identifies simulated permis
   assert.equal(outcomePresentation({defense_evidence_version: 'gateway-v1', call_rejected: false, manifest_check_performed: false, proposed_tool_name: 'evidence'}).defense, 'Manifest policy disabled; simulated permission allowed');
   assert.equal(outcomePresentation({}).defense, 'Legacy / unavailable');
 });
+
+test('MCP history names target matching independently of correctness and marker absence',()=>{
+  const output=outcomePresentation({scoring_version:'investigation-scoring-v1',status:'completed',investigation_scores:{decision_correctness:false,attacker_goal:true,marker_influence:false}});
+  assert.equal(output.attacker,'Target matched');
+  assert.equal(output.task,'Decision fields incorrect');
+  assert.equal(output.injection,'Marker not observed');
+});

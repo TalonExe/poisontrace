@@ -270,7 +270,7 @@ test("matched comparison colors correctness and attacker outcomes in opposite di
   );
   const attacker = page.getByRole("row").filter({
     has: page.getByRole("rowheader", {
-      name: "Attacker goal achieved",
+      name: "Attacker-target matches",
       exact: true,
     }),
   });
@@ -285,6 +285,7 @@ test("matched comparison colors correctness and attacker outcomes in opposite di
   await expect(
     attacker.getByText("Unavailable · 0 eligible", { exact: true }),
   ).toHaveClass(/measurement-unavailable/);
+  await page.getByText("Policy and marker observations", {exact:true}).click();
   const policy = page.getByRole("row").filter({
     has: page.getByRole("rowheader", {
       name: "Discovery restriction observed",
@@ -294,6 +295,7 @@ test("matched comparison colors correctness and attacker outcomes in opposite di
   await expect(policy.getByText("3/3 (100%)", { exact: true })).toHaveClass(
     /measurement-observation/,
   );
+  await page.getByText("Measurement definitions and colors", {exact:true}).click();
   await expect(
     page.getByRole("list", { name: "Outcome colors" }),
   ).toBeVisible();
@@ -323,6 +325,7 @@ for (const [name, correct, scored, completed, failed, expected] of [
   ["all failed", 0, 0, 0, 3, "0/100"],
   ["empty compatible data", 0, 0, 0, 0, "Unavailable"],
   ["completed unscored", 0, 0, 2, 0, "Unavailable"],
+  ["unsupported scoring version", 1, 1, 1, 0, "Unavailable"],
   ["partial unscored retained rerun", 1, 1, 2, 1, "33/100"],
 ]) {
   test(`overall indicator handles ${name}`, async ({ page }) => {
@@ -333,6 +336,7 @@ for (const [name, correct, scored, completed, failed, expected] of [
         ...group.comparison,
         scoring_version: "investigation-scoring-v1",
         attempted: completed + failed,
+        ...(name === "unsupported scoring version" ? {scoring_version:"future-scoring"} : {}),
         by_condition: {
           clean: {
             ...row,
@@ -371,3 +375,27 @@ for (const [name, correct, scored, completed, failed, expected] of [
     }
   });
 }
+
+test('comparison leads decisions and separates observations from execution accounting',async ({page})=>{
+  await setup(page);
+  await page.goto('/results/groups/fixed-group');
+  await expect(page.getByRole('region',{name:'Decision outcomes',exact:true})).toBeVisible();
+  await expect(page.getByRole('region',{name:'Decision outcomes',exact:true})).toContainText('Attacker-target matches');
+  await expect(page.getByRole('region',{name:'Incompatible attempts'})).toBeVisible();
+  await expect(page.getByText('Missing compatible conditions: poisoned, defended.')).toBeVisible();
+  for(const [width,height,name] of [[1440,1000,'desktop'],[390,844,'mobile']]) {
+    await page.setViewportSize({width,height});
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.screenshot({path:`../.scratch/cleanup-36/group-default-${name}.png`,fullPage:true});
+  }
+  for(const name of ['Policy and marker observations','Execution accounting']) {
+    const details=page.locator('details').filter({has:page.locator('summary').getByText(name,{exact:true})});
+    await expect(details).not.toHaveAttribute('open','');
+    await details.locator('summary').focus();
+    await page.keyboard.press('Enter');
+    await expect(details).toHaveAttribute('open','');
+  }
+  await expect(page.getByRole('region',{name:'Execution accounting',exact:true})).toContainText('Mean duration, compatible attempts');
+  await expect(page.getByRole('region',{name:'Execution accounting',exact:true})).toContainText('System error, all saved attempts');
+  await expect(page.getByRole('link',{name:'Inspect attempt 1 · EXP-004'})).toBeVisible();
+});

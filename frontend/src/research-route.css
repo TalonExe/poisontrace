@@ -834,3 +834,46 @@ details.card[open] > summary {
   line-height: 1.2;
   font-variant-numeric: tabular-nums;
 }
+
+.advanced-navigation summary {
+  padding: 13px 14px;
+  min-height: 46px;
+  border-radius: 6px;
+  color: var(--ec-text);
+  cursor: pointer;
+}
+.advanced-navigation button { width: 100%; }
+.advanced-navigation { min-width: 0; }
+
+.execution-selection { min-width: 0; }
+.execution-recovery {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0 16px;
+}
+.execution-recovery a {
+  color: var(--ec-primary);
+  text-decoration: underline;
+  padding: 8px 12px;
+  min-height: 44px;
+  overflow-wrap: anywhere;
+}
+/* Result summaries retain the shared field grid and semantic colors. */
+.investigation-decision .decision-expected,
+.investigation-decision .decision-correctness {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.trace-event-content {
+  min-width: 0;
+  flex: 1;
+}
+.trace-event-content pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 13px;
+  margin: 6px 0 0;
+}
