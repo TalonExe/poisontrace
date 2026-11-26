@@ -11,12 +11,18 @@ import { Outlet } from "@tanstack/react-router";
 
 export const routes = Object.freeze({
   login: "/login",
+  activity: "/activity",
   dashboard: "/dashboard",
+  researchCases: "/research-cases",
+  single: "/dashboard/single",
+  metadata: "/dashboard/metadata",
+  metadataCampaign: "/dashboard/campaign",
   results: "/results",
   resultRuns: "/results/runs",
   resultGroups: "/results/groups",
   resultCampaigns: "/results/campaigns",
   sessions: "/sessions",
+  settings: "/settings",
   scenarios: "/scenarios",
   scenarioNew: "/scenarios/new",
   admin: "/admin",
@@ -40,7 +46,7 @@ export function createRouter({
 } = {}) {
   function RouteContent() {
     // Parameter-only navigation must refresh the selected persisted record too.
-    useRouterState({ select: (state) => state.location.pathname });
+    useRouterState({ select: (state) => state.location.href });
     return renderRoute?.() || null;
   }
   const rootRoute = createRootRoute({
@@ -72,12 +78,15 @@ export function createRouter({
 
   return {
     current: () => normalizePath(tanStackRouter.state.location.pathname),
+    search: () => tanStackRouter.state.location.searchStr,
     navigate(path, { replace = false } = {}) {
       const next = normalizePath(path);
+      const query = path.indexOf("?");
       return ready.then(() => {
         const location = tanStackRouter.buildLocation({ to: next });
-        if (replace) history.replace(location.href);
-        else history.push(location.href);
+        const href = location.pathname + (query === -1 ? "" : path.slice(query));
+        if (replace) history.replace(href);
+        else history.push(href);
         return tanStackRouter.load();
       });
     },

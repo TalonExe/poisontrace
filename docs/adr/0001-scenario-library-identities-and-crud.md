@@ -1,5 +1,7 @@
 # ADR 0001: Scenario library identities and CRUD
 
+Current implementation and verification are recorded in [STATUS.md](../STATUS.md). Dated deferrals and implementation-pending notes below describe adoption context.
+
 ## Status
 
 Accepted

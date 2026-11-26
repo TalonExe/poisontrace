@@ -52,7 +52,10 @@ def test_gemini_model_forwards_api_key_when_constructing_default_client(monkeypa
 
     GeminiModel(model_name="gemini-test", api_key="gemini-secret")
 
+    options = calls[0].pop("http_options")
     assert calls == [{"api_key": "gemini-secret"}]
+    assert options.timeout == 20_000
+    assert options.retry_options.attempts == 1
 
 
 @pytest.mark.parametrize("text", ["not json", '{"tool_name": ""}'])

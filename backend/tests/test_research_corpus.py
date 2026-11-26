@@ -1,3 +1,4 @@
+from job_helpers import complete_investigation
 from collections import Counter
 from poisontrace.adapters.mcp.cases import BundledCases
 
@@ -43,10 +44,11 @@ from poisontrace.config import WebConfig
 ])
 def test_corpus_case_runs_through_real_mcp_and_reopens(tmp_path, analyst_client, identifier, expected):
     config = WebConfig(scenario_dir=tmp_path/'scenarios',database=tmp_path/'runs.db')
-    client = analyst_client(create_app(build_backend(config)))
+    backend = build_backend(config)
+    client = analyst_client(create_app(backend))
     catalog = client.get('/api/runs/investigation-cases').json()
     assert identifier in [case['case_id'] for case in catalog]
-    response = client.post('/api/runs',json=dict(workflow='mcp-investigation-v1',case_id=identifier,mode='clean',provider='scripted'))
+    response = complete_investigation(client, backend, dict(workflow='mcp-investigation-v1',case_id=identifier,mode='clean',provider='scripted'))
     assert response.status_code == 200, response.text
     detail = client.get('/api/runs/'+str(response.json()['run_id'])).json()
     assert detail['status'] == 'completed', detail
@@ -77,7 +79,8 @@ def test_case_rejects_missing_or_ambiguous_evidence(change):
 
 def test_other_case_edit_is_isolated_atomic_and_reopenable(tmp_path, analyst_client):
     config = WebConfig(scenario_dir=tmp_path/'scenarios', database=tmp_path/'runs.db')
-    client = analyst_client(create_app(build_backend(config)))
+    backend = build_backend(config)
+    client = analyst_client(create_app(backend))
     path = '/api/runs/investigation-cases/soc-c2-013'
     original = client.get(path).json()
     payload = {key: original[key] for key in ('expected_decision','dataset_category','attack_targets')}
@@ -98,8 +101,9 @@ def test_other_case_edit_is_isolated_atomic_and_reopenable(tmp_path, analyst_cli
 @pytest.mark.parametrize('mode', ['poisoned','defended'])
 def test_new_case_attacks_keep_evidence_and_ground_truth_comparable(tmp_path, analyst_client, family, mode):
     config=WebConfig(scenario_dir=tmp_path/'scenarios',database=tmp_path/'runs.db')
-    client=analyst_client(create_app(build_backend(config)))
-    response=client.post('/api/runs',json=dict(workflow='mcp-investigation-v1',case_id='soc-c2-013',mode=mode,attack_family=family,provider='scripted'))
+    backend = build_backend(config)
+    client=analyst_client(create_app(backend))
+    response=complete_investigation(client, backend, dict(workflow='mcp-investigation-v1',case_id='soc-c2-013',mode=mode,attack_family=family,provider='scripted'))
     assert response.status_code == 200, response.text
     detail=client.get('/api/runs/'+str(response.json()['run_id'])).json()
     assert detail['status'] == 'completed', detail
@@ -118,6 +122,10 @@ def test_unallocated_attack_rejected_before_credential_lookup_or_attempt(tmp_pat
             pytest.fail('invalid case allocation resolved a credential')
     backend=build_backend(WebConfig(scenario_dir=tmp_path/'scenarios',database=tmp_path/'runs.db'),Secrets(),investigation_model_factory=lambda *args: None)
     client=analyst_client(create_app(backend))
-    response=client.post('/api/runs',json=dict(workflow='mcp-investigation-v1',case_id='soc-backup-002',mode='poisoned',attack_family='description-poisoning',provider='gemini',model='synthetic',credential_id='synthetic'))
+    response=complete_investigation(client, backend, dict(workflow='mcp-investigation-v1',case_id='soc-backup-002',mode='poisoned',attack_family='description-poisoning',provider='gemini',model='synthetic',credential_id='synthetic'))
     assert response.status_code == 400
     assert client.get('/api/runs').json() == []
+
+
+# Trusted caller for direct application checks; HTTP still authenticates independently.
+pytestmark = pytest.mark.usefixtures("application_analyst")

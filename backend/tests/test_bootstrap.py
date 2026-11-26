@@ -1,7 +1,9 @@
 """Configuration and concrete web composition through startup interfaces."""
-from pathlib import Path
 
 import pytest
+pytestmark = pytest.mark.usefixtures("application_analyst")
+from pathlib import Path
+
 from cryptography.fernet import Fernet
 
 from poisontrace.config import WebConfig

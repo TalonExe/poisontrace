@@ -1,5 +1,6 @@
 """Isolated offline browser-test API. Never opens the application databases."""
 from pathlib import Path
+import os
 import sys
 from tempfile import TemporaryDirectory
 
@@ -12,7 +13,7 @@ import uvicorn
 
 
 if __name__ == "__main__":
-    scratch = Path(__file__).resolve().parents[2] / ".scratch" / "mcp-browser"
+    scratch = Path(os.environ['POISONTRACE_VERIFY_STATE']) if os.environ.get('POISONTRACE_VERIFY_STATE') else Path(__file__).resolve().parents[2] / ".scratch" / "mcp-browser"
     scratch.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix="offline-", dir=scratch) as directory:
         root = Path(directory)
@@ -20,7 +21,7 @@ if __name__ == "__main__":
         backend = build_backend(config)
         auth = build_accounts(config.database, seeds=(AccountSeed("browser-researcher", "analyst", "synthetic-browser-test"),))
         app = create_app(backend, auth_service=auth)
-        server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=4175, log_level="error"))
+        server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=4175, log_level="error", timeout_graceful_shutdown=5))
 
         @app.post("/__test_shutdown")
         def shutdown():

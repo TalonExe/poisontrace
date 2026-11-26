@@ -42,11 +42,27 @@ class CampaignScenarioFiles:
     def __init__(self, directory: Path) -> None:
         self._directory = directory
 
-    def select_poisoned(self) -> list[tuple[str, str]]:
-        return [
-            (path.name, load_scenario(path).scenario_id)
-            for path in sorted(self._directory.glob("*poisoned*.yaml"), key=lambda item: item.name)
-        ]
+    def select_poisoned(self) -> tuple[list[tuple[str, str]], list[str]]:
+        selected, excluded = [], []
+        for path in sorted(self._directory.glob("*poisoned*.yaml"), key=lambda item: item.name):
+            try:
+                selected.append((path.name, self.load(path.name).scenario_id))
+            except ValueError:
+                excluded.append(path.name)
+        return selected, excluded
 
     def load(self, filename: str) -> Scenario:
-        return load_scenario(self._directory / filename)
+        if Path(filename).name != filename:
+            raise ValueError("invalid campaign filename")
+        try:
+            scenario = load_scenario(self._directory / filename)
+            if not all(isinstance(value, str) and value.strip() for value in
+                       (scenario.scenario_id, scenario.alert, scenario.expected_recommendation)):
+                raise ValueError("invalid scenario fields")
+            if any(not isinstance(tool.name, str) or not tool.name.strip()
+                   or not isinstance(tool.description, str) or not tool.description.strip()
+                   for tool in (*scenario.tools, *scenario.approved_tools)):
+                raise ValueError("invalid scenario tool")
+            return scenario
+        except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError) as exc:
+            raise ValueError("invalid campaign scenario file") from exc

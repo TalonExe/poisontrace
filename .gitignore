@@ -8,6 +8,7 @@ data/*.db
 # Local application databases and backups
 *.db
 *.db.backup
+*.executor.lock
 
 # Frontend dependencies and generated output
 frontend/node_modules/
@@ -22,3 +23,15 @@ frontend/test-results/
 
 # Local versioned research ground-truth overrides
 /investigation-cases/
+
+# Local documentation and agent/design guidance
+/docs/
+/AGENTS.md
+/frontend/DESIGN.md
+/frontend/ROUTES.md
+
+.agents/
+.claude/
+.codex/
+.cursor/
+.pi/

@@ -1,0 +1,45 @@
+# Packaging profiles only. Hosted privacy/security gates are not complete.
+x-app: &app
+  build: .
+  image: poisontrace:local
+  init: true
+  user: "10001:10001"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 64
+  mem_limit: 1g
+  cpus: 1.0
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+  ports:
+    - "127.0.0.1:${POISONTRACE_LOCAL_PORT:-8000}:8000"
+  stop_grace_period: 30s
+  environment: &environment
+    POISONTRACE_SECRETS_KEY: ${POISONTRACE_SECRETS_KEY:?Supply a generated Fernet key}
+    POISONTRACE_DATA_ROOT: /data
+    POISONTRACE_FRONTEND_ROOT: /opt/poisontrace/frontend
+    POISONTRACE_BIND: 0.0.0.0
+    PORT: "8000"
+
+services:
+  local:
+    <<: *app
+    profiles: [local]
+    volumes: [local-state:/data]
+    environment:
+      <<: *environment
+      POISONTRACE_PROFILE: local
+  hosted:
+    <<: *app
+    profiles: [hosted]
+    volumes: [hosted-state:/data]
+    environment:
+      <<: *environment
+      POISONTRACE_PROFILE: hosted
+      POISONTRACE_PUBLIC_ORIGIN: ${POISONTRACE_PUBLIC_ORIGIN:-}
+      POISONTRACE_TRUSTED_PROXIES: ${POISONTRACE_TRUSTED_PROXIES:-}
+
+volumes:
+  local-state:
+  hosted-state:

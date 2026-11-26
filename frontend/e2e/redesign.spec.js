@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./verification-test.js";
 
 test.beforeEach(async ({ page }) => {
   await page.route(
@@ -27,7 +27,9 @@ test.beforeEach(async ({ page }) => {
                 role: "analyst",
               },
             }
-          : path === "/api/runs"
+          : path === "/api/runs/investigation-cases"
+            ? []
+            : path === "/api/runs"
             ? [run(2), run(1)]
             : path.startsWith("/api/runs/")
               ? run(Number(path.split("/").pop()))
@@ -51,7 +53,7 @@ test("closing a new session leaves saved configurations unchanged", async ({
 }) => {
   await page.goto("/sessions");
   await expect(
-    page.getByRole("heading", { name: "Configurations", exact: true }),
+    page.getByRole("heading", { name: "Settings", exact: true }),
   ).toBeVisible();
   const count = await page.locator(".session-row").count();
   await page
@@ -75,9 +77,10 @@ test("recorded-run selection updates the inspected evidence", async ({
   );
   await page.locator(".trace > summary").click();
   await expect(
-    page.getByText("value: Recommendation 1", { exact: true }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Scenarios", exact: true }).click();
+    page.locator(".trace .timeline pre"),
+  ).toContainText('"value": "Recommendation 1"');
+  await page.locator(".workspace-navigation summary").click();
+  await page.getByRole("button", { name: "Metadata scenarios (YAML)", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Scenario library", exact: true }),
   ).toBeVisible();
@@ -92,7 +95,7 @@ test("mobile navigation remains available without an off-screen drawer", async (
     page.getByRole("navigation", { name: "Workspace navigation" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Configurations", exact: true }),
+    page.getByRole("button", { name: "Settings", exact: true }),
   ).toBeVisible();
   expect(
     await page.evaluate(

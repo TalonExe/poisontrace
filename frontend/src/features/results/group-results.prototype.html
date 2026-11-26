@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoisonTrace · Group results prototype</title>
+<style>
+:root{color-scheme:light;--canvas:#f8faf4;--rail:#eaf0de;--border:#cbd3c2;--ink:#272e24;--muted:#56624e;--purple:#6c299a;--lilac:#f1e9f7;--green:#27603f;--white:#fff;font:15px/1.5 system-ui,sans-serif;color:var(--ink);background:var(--canvas)}
+*{box-sizing:border-box}body{margin:0}.shell{display:grid;grid-template-columns:218px minmax(0,1fr);min-height:100vh}.rail{background:var(--rail);border-right:1px solid var(--border);padding:28px 18px}.brand{display:flex;gap:10px;align-items:center;font-size:20px;font-weight:750;letter-spacing:-.04em}.mark{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;background:var(--purple);color:white;font-size:15px}.rail p{color:var(--muted);font-size:12px;margin:5px 0 32px}.rail-label{padding:11px 14px;margin:5px 0;border-radius:8px}.rail-label.active{color:var(--purple);background:#eadcf4;font-weight:700}
+main{max-width:1450px;width:100%;padding:34px clamp(20px,4vw,58px) 105px}h1,h2,h3,p{margin:0}h1{font-size:36px;letter-spacing:-.06em}h2{font-size:23px;letter-spacing:-.035em}h3{font-size:16px;letter-spacing:-.02em}.muted,small{color:var(--muted)}.preview{font-size:12px;color:var(--muted)}.top{display:flex;justify-content:space-between;align-items:center;gap:20px;margin-bottom:24px}.group-picker{display:grid;gap:4px;font-size:12px;color:var(--muted)}select,button{font:inherit}select{padding:9px 12px;border:1px solid #89977c;border-radius:8px;background:white;color:var(--ink);max-width:100%}button,summary{cursor:pointer}button:focus-visible,summary:focus-visible,select:focus-visible{outline:2px solid var(--purple);outline-offset:3px}.tabs{display:flex;gap:23px;border-bottom:1px solid var(--border);margin-bottom:25px;color:var(--muted);font-size:14px}.tabs span{padding:0 3px 10px}.tabs strong{border-bottom:2px solid var(--purple);color:var(--purple)}
+.group-head{display:flex;justify-content:space-between;align-items:start;gap:16px;margin-bottom:16px}.chip{border-radius:30px;background:#e7f2e8;color:var(--green);padding:4px 10px;font-size:12px;white-space:nowrap}.facts{display:flex;flex-wrap:wrap;column-gap:16px;row-gap:4px;font-size:13px;color:var(--muted)}.kpis,.conditions,.analysis{display:grid;gap:12px;margin-bottom:14px}.kpis{grid-template-columns:1.35fr repeat(3,1fr)}.conditions{grid-template-columns:repeat(3,1fr)}.analysis{grid-template-columns:minmax(0,1.7fr) minmax(0,1fr)}.card{background:var(--white);border:1px solid var(--border);border-radius:13px;padding:17px 19px;min-width:0}.metric{display:block;font-size:32px;line-height:1.2;letter-spacing:-.055em;margin:5px 0;font-variant-numeric:tabular-nums}.featured{background:var(--lilac);border-color:#dbc8e7}.featured .metric{color:var(--purple)}.metrics-label{font-size:13px;color:var(--muted)}.section-label{margin:20px 0 9px}.section-label p{font-size:13px;color:var(--muted)}.rate-row{display:flex;justify-content:space-between;gap:10px;align-items:baseline;margin:7px 0 4px}.rate-row strong{font-size:23px;letter-spacing:-.04em}.track{height:7px;background:#e9eede;border-radius:10px;overflow:hidden}.track i{display:block;height:100%;background:var(--purple);border-radius:10px}.condition-foot{font-size:12px;color:var(--muted);margin-top:7px}.table-scroll{overflow:auto}table{border-collapse:collapse;text-align:left;width:100%;font-size:13px;margin-top:8px}td,th{padding:9px 10px 9px 0;border-bottom:1px solid #e7ebdf}th{font-weight:650}td{font-variant-numeric:tabular-nums}tbody tr:last-child td{border:0}.notes{display:grid;gap:8px}details.card{padding:11px 16px}summary{font-weight:650;color:var(--purple)}details p{color:var(--muted);margin-top:7px;font-size:13px}.side-note{margin-top:10px;font-size:13px;color:var(--muted)}.switch{position:fixed;bottom:14px;left:50%;transform:translateX(-50%);z-index:2;display:flex;gap:4px;background:white;padding:5px;border-radius:11px;border:1px solid var(--border);box-shadow:0 5px 20px #272e241c;max-width:calc(100% - 22px)}.switch button{border:0;border-radius:7px;background:transparent;padding:7px 10px;color:var(--ink);white-space:nowrap;font-size:12px}.switch button[aria-pressed="true"]{background:var(--purple);color:white}
+[data-layout="conditions"] .kpis{grid-template-columns:repeat(4,1fr)}[data-layout="conditions"] .condition-card{padding:23px}[data-layout="conditions"] .conditions .rate-row strong{font-size:33px}[data-layout="compact"] .kpis{grid-template-columns:repeat(2,1fr)}[data-layout="compact"] .analysis{grid-template-columns:1fr;margin-bottom:0}[data-layout="compact"] .compact-grid{display:grid;grid-template-columns: minmax(0,1.75fr) minmax(0,1fr);gap:14px;margin-bottom:15px}[data-layout="compact"] .conditions{grid-template-columns:1fr;margin-top:8px;gap:7px}[data-layout="compact"] .condition-card{padding:10px 13px}[data-layout="compact"] .rate-row strong{font-size:17px}
+@media(max-width:950px){.shell{grid-template-columns:160px minmax(0,1fr)}main{padding-inline:22px}.card{padding:13px}.kpis,.conditions,.analysis{gap:8px}}
+@media(max-width:700px){.shell{display:block}.rail{padding:11px 18px;display:flex;align-items:center;justify-content:space-between;gap:7px}.rail p,.rail-label:not(.active){display:none}.rail-label.active{margin:0;padding:5px 11px}.brand{font-size:17px}main{padding-top:22px}.top{align-items:start;flex-direction:column;gap:9px}.kpis,[data-layout="conditions"] .kpis{grid-template-columns:repeat(2,1fr)}.conditions{grid-template-columns:1fr}.analysis,[data-layout="compact"] .compact-grid{grid-template-columns:1fr}.group-head{align-items:start}.metric{font-size:27px}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="rail" aria-label="PoisonTrace workspace preview">
+    <div class="brand"><span class="mark">P</span>PoisonTrace</div>
+    <p>Synthetic research workspace</p>
+    <div class="rail-label">Experiment</div>
+    <div class="rail-label active">Results</div>
+  </aside>
+  <main>
+    <header class="top"><div><p class="preview">Design prototype · sample data</p><h1>Results</h1></div>
+      <label class="group-picker">Saved group<select id="group"><option value="morning">Authentication alert · Group 014</option><option value="afternoon">Authentication alert · Group 009</option></select></label>
+    </header>
+    <div class="tabs" aria-label="Results sections"><strong><span>Groups</span></strong><span>Overview</span><span>Runs</span><span>Campaigns</span></div>
+    <div id="dashboard"></div>
+  </main>
+</div>
+<div class="switch" role="group" aria-label="Prototype layout">
+  <button type="button" data-view="summary">Summary first</button>
+  <button type="button" data-view="conditions">Condition cards</button>
+  <button type="button" data-view="compact">Comparison first</button>
+</div>
+<script>
+const groups = {
+  morning: {id:"014", repeats:5, decision:[5,2,4], failed:[0,1,0], verdict:[5,3,5], priority:[5,2,4], handling:[5,2,4]},
+  afternoon: {id:"009", repeats:3, decision:[3,1,2], failed:[0,0,0], verdict:[3,2,3], priority:[3,1,2], handling:[3,1,2]}
+};
+const names = ["Clean","Poisoned","Defended"];
+const dashboard = document.querySelector("#dashboard");
+const picker = document.querySelector("#group");
+const buttons = [...document.querySelectorAll("[data-view]")];
+let layout = new URLSearchParams(location.search).get("layout") || "summary";
+if (!buttons.some(button => button.dataset.view === layout)) layout = "summary";
+
+function render() {
+  const group = groups[picker.value];
+  const sum = values => values.reduce((total, value) => total + value, 0);
+  const attempts = group.repeats * names.length;
+  const correct = sum(group.decision);
+  const failed = sum(group.failed);
+  const rate = (value, total) => Math.round(value / total * 100);
+  const headline = `<div class="group-head"><div><h2>Authentication alert</h2><div class="facts"><span>Group ${group.id} · case v1</span><span>Scripted offline</span><span>${group.repeats} repeats per condition</span></div></div><span class="chip">Finished</span></div>`;
+  const metrics = `<section class="kpis" aria-label="Group summary">
+    <div class="card featured"><div class="metrics-label">Overall performance</div><strong class="metric">${rate(correct,attempts)}/100</strong><small>${correct} correct of ${attempts} compatible attempts</small></div>
+    <div class="card"><div class="metrics-label">Saved attempts</div><strong class="metric">${attempts}</strong><small>All three conditions</small></div>
+    <div class="card"><div class="metrics-label">Completed</div><strong class="metric">${attempts-failed}</strong><small>Scored decisions</small></div>
+    <div class="card"><div class="metrics-label">Failed</div><strong class="metric">${failed}</strong><small>Included in overall performance</small></div>
+  </section>`;
+  const cards = `<section><div class="section-label"><h3>By condition</h3><p>All decision fields correct among scored runs</p></div><div class="conditions">${names.map((name,index) => {
+    const eligible = group.repeats-group.failed[index];
+    const value = group.decision[index];
+    return `<article class="card condition-card"><h3>${name}</h3><div class="rate-row"><strong>${rate(value,eligible)}%</strong><small>${value}/${eligible} correct</small></div><div class="track" aria-hidden="true"><i style="width:${rate(value,eligible)}%"></i></div><p class="condition-foot">${group.repeats} saved · ${group.failed[index]} failed</p></article>`;
+  }).join("")}</div></section>`;
+  const table = `<section class="card"><h3>Decision comparison</h3><p class="side-note">Correct decisions / scored runs</p><div class="table-scroll"><table><thead><tr><th scope="col">Measure</th>${names.map(name=>`<th scope="col">${name}</th>`).join("")}</tr></thead><tbody>${[["All decision fields",group.decision],["Verdict",group.verdict],["Priority",group.priority],["Handling",group.handling]].map(([name,values])=>`<tr><th scope="row">${name}</th>${values.map((value,index)=>`<td>${value}/${group.repeats-group.failed[index]}</td>`).join("")}</tr>`).join("")}</tbody></table></div></section>`;
+  const details = `<div class="notes"><details class="card"><summary>How performance is calculated</summary><p>Overall performance divides correct completed decisions by compatible saved attempts, including failures. Condition rates use eligible scored runs.</p></details><details class="card"><summary>Group coverage</summary><p>${attempts} compatible saved attempts. No missing or incompatible attempts in this sample group.</p></details><details class="card"><summary>Retained attempts</summary><p>${names.map((name,i)=>`${name} · ${group.repeats-group.failed[i]} completed · ${group.failed[i]} failed`).join("<br>")}</p></details></div>`;
+  dashboard.dataset.layout = layout;
+  dashboard.innerHTML = headline + (layout === "conditions"
+    ? cards + metrics + `<div class="analysis">${table}${details}</div>`
+    : layout === "compact"
+      ? `<div class="compact-grid"><div class="analysis">${table}</div><div>${metrics}${cards}</div></div>${details}`
+      : metrics + cards + `<div class="analysis">${table}${details}</div>`);
+  for(const button of buttons) button.setAttribute("aria-pressed",button.dataset.view===layout);
+}
+
+for(const button of buttons) button.addEventListener("click",()=>{
+  layout = button.dataset.view;
+  const url = new URL(location.href);
+  url.searchParams.set("layout",layout);
+  try { history.replaceState(null,"",url); } catch {}
+  render();
+});
+picker.addEventListener("change",render);
+render();
+</script>
+</body>
+</html>

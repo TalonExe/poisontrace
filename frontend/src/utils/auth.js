@@ -33,7 +33,7 @@ export function createApiAuth(fetchImpl = fetch) {
   return {
     async getSession() {
       const response = await fetchImpl("/api/auth/session");
-      if (response.status === 401) return null;
+      if (response.status === 401) { session = null; return null; }
       if (!response.ok) throw new Error("Unable to load authentication session.");
       session = (await response.json()).user;
       return session;
@@ -46,8 +46,11 @@ export function createApiAuth(fetchImpl = fetch) {
       });
       if (!response.ok) {
         const invalid = response.status === 401;
-        const error = new Error(invalid ? "Invalid username or passcode. Check your details and try again." : "Unable to reach the sign-in service. Try again shortly.");
-        error.code = invalid ? "INVALID_CREDENTIALS" : "AUTH_UNAVAILABLE";
+        const throttled = response.status === 429;
+        const seconds = Number(response.headers?.get('Retry-After'));
+        const delay = Number.isFinite(seconds) && seconds > 0 ? ` Try again in ${Math.ceil(seconds)} seconds.` : " Try again shortly.";
+        const error = new Error(throttled ? `Too many sign-in attempts.${delay}` : invalid ? "Invalid username or passcode. Check your details and try again." : "Unable to reach the sign-in service. Try again shortly.");
+        error.code = throttled ? "LOGIN_THROTTLED" : invalid ? "INVALID_CREDENTIALS" : "AUTH_UNAVAILABLE";
         throw error;
       }
       const payload = await response.json();
@@ -55,7 +58,8 @@ export function createApiAuth(fetchImpl = fetch) {
       return { ...session, redirect: payload.redirect };
     },
     async signOut() {
-      await fetchImpl("/api/auth/logout", { method: "POST" });
+      const response = await fetchImpl("/api/auth/logout", { method: "POST" });
+      if (!response.ok) throw new Error("Unable to sign out. Check your connection and try again.");
       session = null;
     },
   };

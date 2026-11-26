@@ -1,8 +1,10 @@
 """Run orchestration through its application interface, without HTTP composition."""
 
+import pytest
+pytestmark = pytest.mark.usefixtures("application_analyst")
+
 from pathlib import Path
 
-import pytest
 from cryptography.fernet import Fernet
 
 from poisontrace.adapters.models.fake import FakeModel

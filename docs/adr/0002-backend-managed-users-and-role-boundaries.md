@@ -1,5 +1,7 @@
 # ADR 0002: Backend-managed users and role boundaries
 
+Current implementation and verification are recorded in [STATUS.md](../STATUS.md). Dated deferrals and implementation-pending notes below describe adoption context.
+
 ## Status
 
 Accepted
@@ -20,4 +22,4 @@ The first admin surface is `/admin/users`, with `/admin` redirecting there for s
 
 ## Consequences
 
-The frontend can present role-appropriate navigation, but the backend remains authoritative. The authentication seam must support role-aware login destinations: analysts go to `/sessions`, and superadmins go to `/admin/users`. The system must provide a clear forbidden state rather than silently redirecting an authenticated user across role boundaries. Future administrative features can extend the admin namespace without granting superadmins analyst capabilities by default.
+The frontend can present role-appropriate navigation, but the backend remains authoritative. The authentication seam provides role-aware login destinations. Analysts go to `/dashboard/single`, and superadmins go to `/admin/users`. The system must provide a clear forbidden state rather than silently redirecting an authenticated user across role boundaries. Future administrative features can extend the admin namespace without granting superadmins analyst capabilities by default.

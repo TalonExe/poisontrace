@@ -1,4 +1,5 @@
 """Versioned fixed payloads through the persisted HTTP and real MCP seams."""
+from job_helpers import complete_investigation
 import pytest
 from poisontrace.bootstrap import build_backend, create_app
 from poisontrace.config import WebConfig
@@ -10,7 +11,8 @@ from poisontrace.config import WebConfig
 ])
 def test_v2_catalog_and_saved_discovery_match_while_manifest_withholds_same_payload(tmp_path, analyst_client, family, payload_id):
     config=WebConfig(scenario_dir=tmp_path/'scenarios',database=tmp_path/'runs.db')
-    client=analyst_client(create_app(build_backend(config)))
+    backend = build_backend(config)
+    client=analyst_client(create_app(backend))
     catalog=client.get('/api/runs/investigation-cases').json()
     incident=next(case for case in catalog if case['case_id']=='soc-c2-013')
     profile=next(attack for attack in incident['attacks'] if attack['family']==family)
@@ -21,7 +23,7 @@ def test_v2_catalog_and_saved_discovery_match_while_manifest_withholds_same_payl
     details={}
     for mode in ('clean','poisoned','defended'):
         request=dict(base,mode=mode,**({'attack_family':family} if mode!='clean' else {}))
-        created=client.post('/api/runs',json=request)
+        created=complete_investigation(client, backend, request)
         assert created.status_code==200, created.text
         detail=client.get('/api/runs/'+str(created.json()['run_id'])).json()
         assert detail['status']=='completed', detail
@@ -69,3 +71,7 @@ def test_saved_v1_attack_snapshot_reopens_without_replacing_it_with_active_v2(tm
     assert build_backend(config).runs.get(run_id)==saved
     current=client.get('/api/runs/investigation-cases').json()[0]['attacks']
     assert all(profile['payload_id'].endswith('-v2') for profile in current)
+
+
+# Trusted caller for direct application checks; HTTP still authenticates independently.
+pytestmark = pytest.mark.usefixtures("application_analyst")

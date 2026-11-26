@@ -156,7 +156,7 @@ Clean-call legitimacy is recorded only when the trusted definition establishes a
 
 ## Saved experiment attempt
 
-A validated execution request that reaches the runner and ends as completed or failed. Failures retain elapsed time, fixed safe error categories and available traces, with unscored marker, attacker and recommendation outcomes. Invalid configuration is rejected before a started attempt. Saved IDs return directly from persistence through execution to single-run and campaign callers; globally latest records are not used for attribution. CLI stores remain process-local, as before. Process termination, unavailable storage and durable recovery are outside this slice.
+A validated execution request that reaches the runner and ends as completed or failed. Failures retain elapsed time, fixed safe error categories and available traces, with unscored marker, attacker and recommendation outcomes. Invalid configuration is rejected before a started attempt. Saved IDs return directly from persistence through execution to single-run and campaign callers; globally latest records are not used for attribution. An interruption without a saved result does not count as a saved experiment attempt.
 
 
 ## Measurement rate
@@ -211,3 +211,15 @@ An explicit persisted selection of one synthetic case/version, one provider/mode
 ## Matched comparison eligibility
 
 Agreement with a selected group's case, evidence, targets, provider/model, prompt and settings snapshots, payload, approved definitions and scoring contract. Condition-specific metadata exposure and manifest enforcement are the intended contrast. Failed or missing observations remain explicit; unrelated historical runs are not recruited into a matched group.
+
+## Analyst activity dashboard
+
+An overview of an analyst's own PoisonTrace activity for a selected week or month. It helps the analyst see what work produced saved outcomes and identify work to revisit.
+
+## Saved investigation attempt
+
+A saved experiment attempt from a standalone investigation or a matched run group. It belongs to the reporting period in which its result was saved. A saved failure counts once, and a scheduled slot without a saved result contributes no saved attempt.
+
+## Matched-group rerun
+
+An explicitly submitted execution of an existing matched run group's saved schedule. The rerun counts once in the period of submission. Each saved result from that execution counts separately as a saved investigation attempt.

@@ -1,16 +1,26 @@
 # PoisonTrace context
 
-PoisonTrace evaluates how malicious MCP tool metadata can influence an AI-assisted SOC investigation. The shared domain vocabulary is maintained in [DOMAIN_GLOSSARY.md](DOMAIN_GLOSSARY.md). Implementation decisions and build order are maintained in [IMPLEMENTATION_BRIEF.md](IMPLEMENTATION_BRIEF.md). Module interfaces and test seams are maintained in [ARCHITECTURE.md](ARCHITECTURE.md).
+PoisonTrace is a synthetic research prototype for studying how malicious MCP tool metadata affects AI-assisted SOC investigations. It supports an open-source local edition and a hosted demonstration profile under [ADR 0003](adr/0003-public-demonstration-and-local-distribution.md). Public release readiness is not established.
 
-## Domain boundary
+## Workflows
 
-The Metadata experiment workflow presents synthetic incident alerts and tool metadata to a model, which produces a recommendation and optional proposed call. A post-completion gateway makes simulated permission decisions; it does not retrieve evidence or execute an external MCP tool. New experiments separately measure marker influence, explicit attacker-target recommendations, legitimate recommendation correctness, actual gateway rejection and errors. These measurements do not establish evidence-based investigation or completion of the report objectives. See [slice-one measurements](research/SLICE_ONE_MEASUREMENTS.md) for conditions, compatibility and formulas.
+MCP investigations retrieve evidence through two fixed local Python stdio MCP servers before producing a verdict, P1–P4 priority, close/escalate handling and an explanation referencing returned evidence. Fifteen deterministic cases cover benign activity, false-positive alerts and malicious incidents. Scripted offline, Gemini and OpenAI adapters share the evidence loop. Description poisoning and cross-server tool shadowing are the two fixed attack families; manifest comparison is the sole evaluated defense.
 
+Metadata experiments are a separate workflow. A model returns a recommendation and optional proposed call before a simulated gateway permission decision. This workflow retrieves no evidence and executes no external MCP tool. Metadata campaigns retain their own historical selection and measurement meanings.
 
-Ticket #21 adds a separate clean MCP investigation for one bundled immutable synthetic case. A scripted offline model discovers three real read-only tools in a fresh local stdio process, receives their evidence before deciding, and saves a structured verdict, priority, handling and referenced explanation. Dashboard launches it; Results reopens the saved decision, evidence and trace. The new workflow has separately versioned decision outcomes and does not reinterpret historical metadata runs. Ticket #22 adds Gemini investigation continuation and explicit model/credential-reference selection, verified with offline SDK substitutes and actual MCP. Ticket #23 adds OpenAI evidence continuation with the same offline verification boundary. Ticket #24 adds actual two-server description poisoning/shadowing, explicit payload selection and saved attack provenance. Ticket #25 adds manifest checks before exposure/invocation and saved independent policy observations. Ticket #26 adds separately versioned structured scores and ground-truth authoring. No live-provider effectiveness has been measured. New investigation-scoring-v1 records keep field correctness, explicit goals, raw marker availability, reference validation and actual policy observations separate; historical records retain their meanings. See [the clean MCP contract](research/CLEAN_MCP_INVESTIGATION.md).
+The analyst dashboard opens after sign-in and summarizes the analyst's own investigation activity by calendar week or month. Configurations prepares reusable settings. Experiment submits single investigations or explicit matched groups. Results reopens saved decisions, evidence, traces and comparisons. Matched groups pin case/evidence/targets, provider/model, payload, prompts/settings, approved definitions and scoring versions. Explicit reruns append attempts under the saved plan.
 
-Ticket #27 completes the fifteen-case read-only corpus with five cases per category and experimental P1-P4 coverage. New decisions use canonical-handling-v2: close/escalate plus detailed recommendation and reasoning in explanation. Exact scoring and historical saved meanings remain unchanged. The corpus and attack allocation are documented in research/SYNTHETIC_RESEARCH_CORPUS.md. Matched groups/repeats remain #28.
+## Scope and interpretation
 
-The authorized payload revision now selects fixed soc-auth-description-v2/soc-auth-shadow-v2 metadata, using source-backed authority/replay and cross-server compatibility pretexts. Exact v1/v2 archives and effectiveness limits are documented in research/MCP_PAYLOAD_REVISION_V2.md. Evidence/scoring/defense are unchanged; saved v1 snapshots are preserved.
+Only synthetic data and read-only MCP evidence tools are supported. Recommendations do not change incident state or execute response actions. Ground truth and attacker targets stay outside model inputs and MCP child snapshots. Marker influence, attacker-goal achievement, decision correctness, reference membership and policy observations are independent measurements. Historical records retain their original meanings and unavailable values.
 
-Ticket #28 now adds explicit persisted matched groups and repeats, configured on Dashboard and compared under Results Groups. Selected inputs, condition-specific metadata expectations and versioned prompt/settings/scoring snapshots define eligibility. Historical campaigns remain separate. See research/MATCHED_RUN_GROUPS.md for schedules, failures, denominators and reruns.
+Local authoring remains available; hosted scenarios and ground truth are curated and read-only. Backend authentication supplies ownership for credentials, history, campaigns, groups and jobs. Analyst and superadmin roles remain separate. Legacy ownerless records are quarantined without guessed attribution.
+
+Offline substitutes and real local MCP checks establish implementation mechanics, not live-model effectiveness or production SOC validity. Paid evaluation, provisioning, pilot access and public release each require separate authorization. Research tickets #29–#31 are cancelled.
+
+## Read next
+
+- [Domain glossary](DOMAIN_GLOSSARY.md) defines canonical terms.
+- [Architecture](ARCHITECTURE.md) describes current modules and test seams.
+- [Status](STATUS.md) records current implementation, verification and remaining work.
+- [Research scope](SCOPE_REFINEMENT.md) defines included and excluded research capabilities.

@@ -13,7 +13,7 @@ from poisontrace.domain import ExperimentMode, ExperimentResult
 
 
 @pytest.mark.parametrize("first", [SqliteTraceStore, SqliteCampaignStore])
-def test_shared_schema_reopens_existing_data_and_child_associations(tmp_path, first):
+def test_shared_schema_reopens_existing_data_and_child_associations(tmp_path, first, application_analyst):
     database = tmp_path / "shared.db"
     first(database)
     traces = SqliteTraceStore(database)

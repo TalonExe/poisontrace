@@ -1,10 +1,13 @@
-import React, { useState } from "react";
-import { CardHead, Icon } from "../../components/common/Ui";
+import React, { useEffect, useRef } from "react";
+import { CardHead } from "../../components/common/Ui";
 import { outcomePresentation } from "../../utils/outcomePresentation";
 import { InvestigationOutcome } from "./InvestigationOutcome";
 
-export function RunInspection({ selectedRun }) {
-  const [traceOpen, setTraceOpen] = useState(false);
+export function RunInspection({ selectedRun, traceOpen = false }) {
+  const traceHeading = useRef(null);
+  useEffect(() => {
+    if (traceOpen) traceHeading.current?.focus();
+  }, [traceOpen]);
   const selectedOutcomes = outcomePresentation(selectedRun);
   const investigation = [
     "investigation-unscored-v1",
@@ -78,8 +81,8 @@ export function RunInspection({ selectedRun }) {
           </div>
         </article>
       )}
-      <details className="card trace">
-        <summary>
+      <details className="card trace" open={traceOpen || undefined}>
+        <summary ref={traceHeading}>
           <h2>Recorded trace</h2>
           <span>Inspect the ordered events for this attempt</span>
         </summary>
@@ -91,57 +94,16 @@ export function RunInspection({ selectedRun }) {
                 <i
                   className={event.kind === "policy_decision" ? "red" : "cyan"}
                 />
-                <p>
+                <div className="trace-event-content">
                   <strong>{event.kind.replaceAll("_", " ")}</strong>
-                  <small>
-                    {Object.entries(event.data)
-                      .map(
-                        ([key, value]) =>
-                          `${key}: ${typeof value === "object" ? JSON.stringify(value) : value}`,
-                      )
-                      .join(" · ")}
-                  </small>
-                </p>
+                  <pre>{JSON.stringify(event, null, 2)}</pre>
+                </div>
               </div>
             ))
           ) : (
             <p className="empty-state">No persisted trace events.</p>
           )}
         </div>
-        <button className="link-button" onClick={() => setTraceOpen(true)}>
-          Open full trace <Icon name="arrow" size={12} />
-        </button>
-        {traceOpen && (
-          <div
-            className="trace-placeholder"
-            role="region"
-            aria-label="Trace inspection"
-          >
-            <div className="card-head">
-              <div>
-                <p className="label">Trace inspection</p>
-                <h2>{selectedRun?.id || "Selected run"}</h2>
-              </div>
-              <button
-                className="icon-button"
-                onClick={() => setTraceOpen(false)}
-                aria-label="Close trace"
-              >
-                <Icon name="close" size={16} />
-              </button>
-            </div>
-            <p>Recorded events for the selected experiment.</p>
-            <div className="placeholder-events">
-              {selectedRun?.trace?.map((event, index) => (
-                <div key={`${event.kind}-full-${index}`}>
-                  <i className="cyan" />
-                  <span>{event.kind.replaceAll("_", " ")}</span>
-                  <small>{JSON.stringify(event.data)}</small>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </details>
     </>
   );

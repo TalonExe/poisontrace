@@ -1,6 +1,8 @@
 """Exercise credential behavior without a web adapter or HTTP application."""
 
 import pytest
+pytestmark = pytest.mark.usefixtures("application_analyst")
+
 from cryptography.fernet import Fernet
 
 from poisontrace.application.credentials import CredentialApplicationService

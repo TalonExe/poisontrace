@@ -1538,15 +1538,15 @@ button {
   padding: 16px 4px;
   background: none;
   border: 0;
-  border-bottom: 1px solid #2a3542;
-  color: #dce4eb;
+  border-bottom: 1px solid var(--ec-border);
+  color: var(--ec-text);
   text-align: left;
 }
 .scenario-library .scenario-row > input {
   flex: 0 0 auto;
   width: 15px;
   height: 15px;
-  accent-color: #65c8d6;
+  accent-color: var(--ec-primary);
 }
 .scenario-row-content {
   display: flex;
@@ -1574,6 +1574,9 @@ button {
 .scenario-row-content b {
   flex: 0 0 auto;
   margin-left: auto;
+}
+.scenario-library .scenario-row-content small {
+  color: var(--ec-text-muted);
 }
 .loading-icon {
   display: inline-block;

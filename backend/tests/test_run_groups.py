@@ -1,3 +1,5 @@
+from job_helpers import complete_application_group
+from job_helpers import complete_group
 from poisontrace.bootstrap import build_backend, create_app
 from poisontrace.config import WebConfig
 
@@ -6,7 +8,7 @@ def test_group_runs_six_linked_attempts_and_reopens_after_restart(tmp_path, anal
     config = WebConfig(scenario_dir=tmp_path/'scenarios', database=tmp_path/'runs.db')
     backend = build_backend(config)
     client = analyst_client(create_app(backend))
-    response = client.post('/api/run-groups', json={
+    response = complete_group(client, backend, json={
         'case_id':'soc-auth-001', 'case_version':'1', 'provider':'scripted',
         'attack_family':'cross-server-shadowing', 'conditions':['clean','poisoned','defended'], 'repeats':2})
     assert response.status_code == 200, response.text
@@ -47,7 +49,7 @@ def test_invalid_group_has_no_started_attempt(tmp_path, changes):
     request=dict(case_id='soc-auth-001',case_version='1',provider='scripted',attack_family='description-poisoning',conditions=['clean','poisoned'],repeats=1)
     request.update(changes)
     with pytest.raises((ValueError,KeyError)):
-        backend.groups.create(request)
+        complete_application_group(backend, request)
     assert backend.groups.list()==[]
     assert backend.runs.list()==[]
 
@@ -57,10 +59,19 @@ def test_clean_control_rerun_keeps_original_case_snapshot_and_prior_attempt(tmp_
     backend=build_backend(config)
     client=analyst_client(create_app(backend))
     request=dict(case_id='soc-backup-002',case_version='1',provider='scripted',conditions=['clean'],repeats=1)
-    created=client.post('/api/run-groups',json=request).json()
+    created=complete_group(client, backend,json=request).json()
     edited=backend.runs.investigation_case('soc-backup-002')
     backend.runs.update_investigation_case('soc-backup-002',dict(base_version='1',expected_decision=dict(verdict='malicious',priority='P2',handling='escalate'),dataset_category=edited['dataset_category'],attack_targets={}))
-    rerun=client.post('/api/run-groups/'+created['group_id']+'/execute',json={})
+    # Current catalog and new groups use the revision; old setup is rejected.
+    catalog=client.get('/api/runs/investigation-cases').json()
+    assert next(item for item in catalog if item['case_id']=='soc-backup-002')['case_version']=='2'
+    assert complete_group(client, backend,json=request).status_code==400
+    fresh=complete_group(client, backend,json={**request,'case_version':'2'})
+    assert fresh.status_code==200,fresh.text
+    assert fresh.json()['plan']['case']['case_version']=='2'
+    fresh_run=backend.runs.get(fresh.json()['attempts'][0]['run_id'])
+    assert fresh_run['investigation']['scores']['decision_correctness'] is False
+    rerun=complete_group(client, backend, '/api/run-groups/'+created['group_id']+'/execute',json={})
     assert rerun.status_code==200,rerun.text
     group=rerun.json()
     assert len(group['attempts'])==2
@@ -73,7 +84,7 @@ def test_clean_control_rerun_keeps_original_case_snapshot_and_prior_attempt(tmp_
         assert backend.runs.get(attempt['run_id'])['investigation']['case_version']=='1'
     backend.groups.profiles['scripted']={**backend.groups.profiles['scripted'],'prompt_version':'future'}
     with pytest.raises(ValueError,match='runtime or payload changed'):
-        backend.groups.execute(group['group_id'],{})
+        complete_application_group(backend, {}, group['group_id'])
     assert len(backend.groups.get(group['group_id'])['attempts'])==2
 
 
@@ -84,7 +95,7 @@ def test_failed_attempt_does_not_stop_repeats_and_nulls_are_retained(tmp_path):
             raise RuntimeError('private diagnostic must not be saved')
     models=iter([Failure,ScriptedInvestigationModel])
     backend.runs.investigations.model_factory=lambda: next(models)()
-    group=backend.groups.create(dict(case_id='soc-auth-001',case_version='1',provider='scripted',conditions=['clean'],repeats=2))
+    group=complete_application_group(backend, dict(case_id='soc-auth-001',case_version='1',provider='scripted',conditions=['clean'],repeats=2))
     assert len(group['attempts'])==2
     row=group['comparison']['by_condition']['clean']
     assert (row['failed'],row['completed'])==(1,1)
@@ -98,7 +109,7 @@ def test_failed_attempt_does_not_stop_repeats_and_nulls_are_retained(tmp_path):
 
 def test_comparison_excludes_changed_contracts_and_unlinked_slots(tmp_path):
     backend=build_backend(WebConfig(scenario_dir=tmp_path/'scenarios',database=tmp_path/'runs.db'))
-    group=backend.groups.create(dict(case_id='soc-auth-001',case_version='1',provider='scripted',conditions=['clean'],repeats=1))
+    group=complete_application_group(backend, dict(case_id='soc-auth-001',case_version='1',provider='scripted',conditions=['clean'],repeats=1))
     identifier=group['attempts'][0]['run_id']
     original=backend.store.result_for(identifier)
     variants=[replace(original,prompt_version='old'), replace(original,model_name='other'),
@@ -116,7 +127,7 @@ def test_comparison_excludes_changed_contracts_and_unlinked_slots(tmp_path):
 
 def test_changed_payload_and_unexpected_metadata_are_excluded_but_condition_contrast_is_eligible(tmp_path):
     backend=build_backend(WebConfig(scenario_dir=tmp_path/'scenarios',database=tmp_path/'runs.db'))
-    group=backend.groups.create(dict(case_id='soc-auth-001',case_version='1',provider='scripted',attack_family='description-poisoning',conditions=['poisoned','defended'],repeats=1))
+    group=complete_application_group(backend, dict(case_id='soc-auth-001',case_version='1',provider='scripted',attack_family='description-poisoning',conditions=['poisoned','defended'],repeats=1))
     results={a['run_id']:backend.store.result_for(a['run_id']) for a in group['attempts']}
     assert group['comparison']['excluded_attempts']==[]
     identifier=group['attempts'][0]['run_id']
@@ -140,12 +151,12 @@ def test_unallocated_group_is_rejected_before_any_credential_reference(tmp_path)
             raise AssertionError('credentials must not be inspected')
     backend=build_backend(WebConfig(scenario_dir=tmp_path/'scenarios',database=tmp_path/'runs.db'), secrets=UnreadSecrets())
     with pytest.raises(ValueError,match='allocated'):
-        backend.groups.create(dict(case_id='soc-backup-002',case_version='1',provider='openai',model='gpt-5-mini',credential_id='synthetic',attack_family='description-poisoning',conditions=['clean','poisoned'],repeats=1))
+        complete_application_group(backend, dict(case_id='soc-backup-002',case_version='1',provider='openai',model='gpt-5-mini',credential_id='synthetic',attack_family='description-poisoning',conditions=['clean','poisoned'],repeats=1))
     assert backend.groups.list()==[]
 
 def test_same_prompt_version_with_changed_prompt_snapshot_is_incompatible(tmp_path):
     backend=build_backend(WebConfig(scenario_dir=tmp_path/'scenarios',database=tmp_path/'runs.db'))
-    group=backend.groups.create(dict(case_id='soc-auth-001',case_version='1',provider='scripted',conditions=['clean'],repeats=1))
+    group=complete_application_group(backend, dict(case_id='soc-auth-001',case_version='1',provider='scripted',conditions=['clean'],repeats=1))
     identifier=group['attempts'][0]['run_id']
     result=backend.store.result_for(identifier)
     changed=deepcopy(result.investigation)
@@ -183,7 +194,7 @@ def test_provider_group_repeats_use_fresh_offline_sdk_clients_and_exact_settings
         return OpenAIInvestigationModel(client=SimpleNamespace(responses=SimpleNamespace(create=respond)),model_name=model)
     backend=build_backend(WebConfig(scenario_dir=tmp_path/'scenarios',database=tmp_path/'runs.db'),Secrets(),investigation_model_factory=factory)
     client=analyst_client(create_app(backend))
-    response=client.post('/api/run-groups',json=dict(case_id='soc-auth-001',case_version='1',provider=provider,model='selected-snapshot',credential_id='synthetic-private-reference',conditions=['clean'],repeats=2))
+    response=complete_group(client, backend,json=dict(case_id='soc-auth-001',case_version='1',provider=provider,model='selected-snapshot',credential_id='synthetic-private-reference',conditions=['clean'],repeats=2))
     assert response.status_code==200,response.text
     group=response.json()
     assert group['comparison']['excluded_attempts']==[]
@@ -202,7 +213,7 @@ def test_initialization_failures_retain_all_attempt_reliability_without_claiming
         def retrieve(self,identifier):return 'SYNTHETIC_GROUP_KEY'
     def fail(*args):raise RuntimeError('SYNTHETIC_GROUP_KEY must not be saved')
     backend=build_backend(WebConfig(scenario_dir=tmp_path/'scenarios',database=tmp_path/'runs.db'),Secrets(),investigation_model_factory=fail)
-    group=backend.groups.create(dict(case_id='soc-auth-001',case_version='1',provider='openai',model='selected-snapshot',credential_id='synthetic',conditions=['clean'],repeats=2))
+    group=complete_application_group(backend, dict(case_id='soc-auth-001',case_version='1',provider='openai',model='selected-snapshot',credential_id='synthetic',conditions=['clean'],repeats=2))
     row=group['comparison']['by_condition']['clean']
     assert row['saved_failed']==2
     assert row['all_saved_error_rate']==dict(numerator=2,denominator=2,value=1.0)
@@ -210,3 +221,7 @@ def test_initialization_failures_retain_all_attempt_reliability_without_claiming
     assert all(value>=0 for value in row['unavailable'].values())
     assert len(group['attempts'])==2
     assert 'SYNTHETIC_GROUP_KEY' not in str(group)
+
+
+# Trusted caller for direct application checks; HTTP still authenticates independently.
+pytestmark = pytest.mark.usefixtures("application_analyst")

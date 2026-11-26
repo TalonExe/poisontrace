@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { Icon } from "../components/common/Ui";
 
-export function LoginPage({ auth, onAuthenticated }) {
+export function LoginPage({ auth, onAuthenticated, notice }) {
   const [username, setUsername] = useState("");
   const [passcode, setPasscode] = useState("");
   const [status, setStatus] = useState("idle");
@@ -30,9 +30,10 @@ export function LoginPage({ auth, onAuthenticated }) {
         </div>
         <div className="login-copy">
           <h1>Sign in to PoisonTrace</h1>
-          <p>Use your local account to access the synthetic research workspace.</p>
+          <p>Use your account to access the synthetic research workspace.</p>
         </div>
         <form className="login-form" onSubmit={submit}>
+          {notice && <p role="status">{notice}</p>}
           <label className="field">
             <span>Username</span>
             <input
@@ -44,7 +45,7 @@ export function LoginPage({ auth, onAuthenticated }) {
             />
           </label>
           <label className="field">
-            <span>Local passcode</span>
+            <span>Passcode</span>
             <input
               type="password"
               autoComplete="current-password"
@@ -67,7 +68,7 @@ export function LoginPage({ auth, onAuthenticated }) {
             <Icon name="arrow" size={14} />
           </button>
         </form>
-        <p className="demo-note">Local synthetic environment. Ask your administrator for account details.</p>
+        <p className="demo-note">Synthetic research workspace. Ask your administrator for account details.</p>
       </div>
       <footer>
         <span>PoisonTrace</span>

@@ -1,22 +1,31 @@
 export function createRunApi(http) {
   return {
+    getActivity: (start, end) =>
+      http.request(`/runs/activity?${new URLSearchParams({ start, end })}`, {
+        fallback: "Dashboard activity unavailable",
+      }).then(data => {
+        if (!["attempts", "groups", "reruns"].every(key => Array.isArray(data?.[key])))
+          throw new Error("Dashboard activity unavailable");
+        return data;
+      }),
+    listInvestigationJobs: () => http.request('/investigation-jobs', {fallback: 'Investigation jobs unavailable'}),
     listRunGroups: () =>
       http.request("/run-groups", { fallback: "Run groups unavailable" }),
     getRunGroup: (id) =>
       http.request(`/run-groups/${encodeURIComponent(id)}`, {
         fallback: "Run group not found",
       }),
-    createRunGroup: (payload) =>
+    createRunGroup: (payload, intent) =>
       http.request("/run-groups", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": intent },
         body: JSON.stringify(payload),
         fallback: "Run group could not complete",
       }),
-    executeRunGroup: (id, payload) =>
+    executeRunGroup: (id, payload, intent) =>
       http.request(`/run-groups/${encodeURIComponent(id)}/execute`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": intent },
         body: JSON.stringify(payload),
         fallback: "Group rerun could not complete",
       }),
@@ -43,10 +52,11 @@ export function createRunApi(http) {
       credentialId,
       mode = "clean",
       attackFamily,
+      intent,
     }) =>
-      http.request("/runs", {
+      http.request("/investigation-jobs", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": intent },
         body: JSON.stringify({
           workflow: "mcp-investigation-v1",
           case_id: caseId,
@@ -74,11 +84,13 @@ export function createRunApi(http) {
       model = "fake",
       sessionId = "",
       credentialId = "",
+      intent,
     }) =>
-      http.request("/runs", {
+      http.request("/investigation-jobs", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "Idempotency-Key": intent },
         body: JSON.stringify({
+          workflow: "metadata-v1",
           scenario_id: scenarioId,
           mode: mode.toLowerCase(),
           provider,

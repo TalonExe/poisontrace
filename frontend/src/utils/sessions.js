@@ -4,7 +4,6 @@ export const defaultSession = {
   name: "Authentication alert study",
   model: "gemini",
   credentialId: "",
-  scenario: "Authentication alert",
   updated: "just now",
 };
 
@@ -22,7 +21,6 @@ export function createSession(now = Date.now()) {
     name: "New investigation session",
     model: "gemini",
     credentialId: "",
-    scenario: "Authentication alert",
     updated: "just now",
   };
 }

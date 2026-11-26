@@ -19,6 +19,7 @@ class SqliteAccountStore:
     @contextmanager
     def transaction(self):
         with sqlite3.connect(self.database) as connection:
+            connection.execute("BEGIN IMMEDIATE")
             yield _SqliteAccountRecords(connection)
 
 
@@ -47,15 +48,38 @@ class _SqliteAccountRecords:
     def touch_login(self, user_id: int) -> None:
         self._db.execute("UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = ?", (user_id,))
 
-    def add_session(self, token_hash: str, user_id: int) -> None:
-        self._db.execute("INSERT INTO auth_sessions (token_hash, user_id) VALUES (?, ?)", (token_hash, user_id))
+    def add_session(self, token_hash: str, user_id: int, expires_at: float) -> None:
+        self._db.execute("INSERT INTO auth_sessions (token_hash, user_id, expires_at) VALUES (?, ?, ?)", (token_hash, user_id, expires_at))
 
-    def session_user(self, token_hash: str) -> AuthUser | None:
-        row = self._db.execute("SELECT u.id, u.username, u.display_name, u.role, u.status, u.created_at, u.last_login_at FROM users u JOIN auth_sessions s ON s.user_id = u.id WHERE s.token_hash = ?", (token_hash,)).fetchone()
+    def session_user(self, token_hash: str, now: float) -> AuthUser | None:
+        self._db.execute("DELETE FROM auth_sessions WHERE expires_at IS NULL OR expires_at <= ?", (now,))
+        row = self._db.execute("SELECT u.id, u.username, u.display_name, u.role, u.status, u.created_at, u.last_login_at FROM users u JOIN auth_sessions s ON s.user_id = u.id WHERE s.token_hash = ? AND s.expires_at > ?", (token_hash, now)).fetchone()
         return AuthUser(*row) if row else None
 
     def delete_session(self, token_hash: str) -> None:
         self._db.execute("DELETE FROM auth_sessions WHERE token_hash = ?", (token_hash,))
+
+    def delete_user_sessions(self, user_id: int) -> None:
+        self._db.execute("DELETE FROM auth_sessions WHERE user_id = ?", (user_id,))
+
+    def replace_passcode(self, user_id: int, passcode_hash: str) -> None:
+        self._db.execute("UPDATE users SET passcode_hash = ? WHERE id = ?", (passcode_hash, user_id))
+
+    def reserve_login(self, keys: tuple[tuple[str, int], ...], now: float) -> int:
+        import math
+        self._db.execute("DELETE FROM login_limits WHERE expires_at <= ?", (now,))
+        waits = []
+        for key, limit in keys:
+            row = self._db.execute("SELECT attempts, expires_at FROM login_limits WHERE key_hash = ?", (key,)).fetchone()
+            if row and row[0] >= limit:
+                waits.append(math.ceil(row[1] - now))
+        if waits:
+            return max(waits)
+        if self._db.execute("SELECT COUNT(*) FROM login_limits").fetchone()[0] + len(keys) > 4096:
+            return 300
+        for key, limit in keys:
+            self._db.execute("INSERT INTO login_limits (key_hash, attempts, expires_at) VALUES (?, 1, ?) ON CONFLICT(key_hash) DO UPDATE SET attempts = attempts + 1", (key, now + 300))
+        return 0
 
     def list_users(self, username_pattern: str, display_name_pattern: str) -> list[AuthUser]:
         rows = self._db.execute(f"SELECT {_USER_COLUMNS} FROM users WHERE username LIKE ? OR display_name LIKE ? ORDER BY username", (username_pattern, display_name_pattern)).fetchall()

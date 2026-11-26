@@ -1,8 +1,10 @@
 """Run orchestration and recorded evidence behind an application interface."""
+from __future__ import annotations
 
 from dataclasses import asdict, replace
 import json
 
+from poisontrace.application.content_policy import ContentPolicy
 from poisontrace.application.contracts import RunDetailResponse, RunRequest, RunResponse
 from poisontrace.application.errors import ScenarioNotFound
 from poisontrace.application.ports import ModelFactory, RunStore, SecretsAdapter, UsableScenarioLookup
@@ -11,6 +13,19 @@ from poisontrace.domain.metrics import calculate_metrics
 from poisontrace.application.gateway import ToolGateway
 from poisontrace.application.execution import ScenarioRunner
 from poisontrace.domain import investigation_attack
+from poisontrace.application.principals import analyst_owner_id
+
+
+def require_run_analyst():
+    owner = analyst_owner_id()
+    if owner is None:
+        raise KeyError('run not found')
+    return owner
+
+
+def authorize_run(store: RunStore, run_id: int) -> None:
+    if store.owner_for(run_id) != require_run_analyst():
+        raise KeyError('run not found')
 
 
 class RunApplicationService:
@@ -22,7 +37,9 @@ class RunApplicationService:
         secrets: SecretsAdapter | None = None,
         investigations=None,
         investigation_model_factory=None,
+        content_policy: ContentPolicy = ContentPolicy(),
     ) -> None:
+        self.content_policy = content_policy
         self.store = store
         self.scenarios = scenarios
         self._model_factory = model_factory
@@ -38,6 +55,7 @@ class RunApplicationService:
         return {key: getattr(case, key) for key in ('case_id', 'case_version', 'name', 'expected_decision', 'dataset_category', 'attack_targets', 'supported_attack_families')}
 
     def update_investigation_case(self, case_id, payload):
+        self.content_policy.require_writable()
         if set(payload) != {'base_version', 'expected_decision', 'dataset_category', 'attack_targets'}:
             raise ValueError('supply only case ground truth and base_version')
         case = self.investigations.cases.get(case_id)
@@ -59,13 +77,27 @@ class RunApplicationService:
             raise ScenarioNotFound(str(scenario_id)) from exc
 
     def list(self) -> list[RunResponse]:
-        return [self.summary(run_id) for run_id in self.store.run_ids()]
+        return [self.summary(run_id) for run_id in self.owned_run_ids()]
+
+    def owned_run_ids(self) -> list[int]:
+        owner = analyst_owner_id()
+        return self.store.run_ids_for(owner) if owner is not None else []
+
+    def authorize(self, run_id: int) -> None:
+        authorize_run(self.store, run_id)
+
+    def result_for(self, run_id: int) -> ExperimentResult:
+        self.authorize(run_id)
+        return self.store.result_for(run_id)
 
     def metrics(self) -> dict:
-        return asdict(calculate_metrics([self.store.result_for(run_id) for run_id in self.store.run_ids()]))
+        return asdict(calculate_metrics([self.result_for(run_id) for run_id in self.owned_run_ids()]))
+
+    def activity(self, start: int, end: int) -> dict:
+        return self.store.activity_for(require_run_analyst(), start, end)
 
     def get(self, run_id: int) -> RunDetailResponse:
-        result = self.store.result_for(run_id)
+        result = self.result_for(run_id)
         events = self.store.events_for(run_id)
         return {
             **self.summary(run_id, result),
@@ -141,11 +173,15 @@ class RunApplicationService:
 
 
     def create(self, payload: RunRequest) -> RunResponse:
+        scenario, mode, configuration = self.prepare_metadata(payload)
+        result = self.run_metadata(scenario, mode, configuration, payload.get("model"))
+        return self.summary(result.run_id, result)
+
+    def prepare_metadata(self, payload: RunRequest):
+        require_run_analyst()
         workflow = payload.get("workflow", "metadata-v1")
         if workflow == "mcp-investigation-v1":
-            case, configuration, factory = self.prepare_investigation(payload)
-            result = self.investigations.run_snapshot(case, configuration, model_factory=factory)
-            return self.summary(result.run_id, result)
+            raise ValueError('submit single investigations through the durable job service')
         if workflow != "metadata-v1":
             raise ValueError("unknown execution workflow")
         scenario_id = payload.get("scenario_id", "authentication-alert")
@@ -156,20 +192,33 @@ class RunApplicationService:
         provider = payload.get("provider", payload.get("model", "fake"))
         if provider not in {"fake", "gemini", "openai"}:
             raise ValueError(f"unsupported provider: {provider}")
-        model_name = payload.get("model") if provider in {"gemini", "openai"} else None
         credential_id = str(payload.get("credential_id", ""))
-        api_key = None
+        if provider in {"openai", "gemini"} and not credential_id:
+            raise ValueError("provider execution requires a credential reference")
         if credential_id:
             if self.secrets is None:
                 raise ValueError("credential storage is not configured")
             reference = self.secrets.reference(credential_id)
             if reference.provider != provider:
                 raise ValueError(f"credential provider {reference.provider} does not match run provider {provider}")
-            api_key = self.secrets.retrieve(credential_id)
+            self.secrets.retrieve(credential_id)
         scenario = self._scenario(scenario_id)
+        ScenarioRunner.validate_condition(scenario.approved_tools if mode == ExperimentMode.CLEAN else scenario.tools)
+        return scenario, mode, {
+            "session_id": str(payload.get("session_id", "")),
+            "provider": provider,
+            "credential_id": credential_id,
+        }
+
+    def run_metadata(self, scenario, mode, configuration, model_name):
+        mode = ExperimentMode(mode)
+        provider = configuration["provider"]
+        credential_id = configuration["credential_id"]
+        if provider == "fake" and "campaign_id" not in configuration:
+            model_name = None
         runner = ScenarioRunner(
             model=None,
-            model_factory=lambda: self._model_factory(provider, model_name, api_key),
+            model_factory=lambda: self._model_factory(provider, model_name, self.secrets.retrieve(credential_id) if credential_id else None),
             trace_store=self.store,
             gateway=ToolGateway(
                 approved_manifest=scenario.approved_tools if scenario.approved_tools is not None else scenario.tools,
@@ -177,18 +226,10 @@ class RunApplicationService:
                 enforce_manifest=mode != ExperimentMode.POISONED,
             ),
         )
-        result = runner.run(
-            scenario,
-            mode,
-            {
-                "session_id": str(payload.get("session_id", "")),
-                "provider": provider,
-                "credential_id": credential_id,
-            },
-        )
-        return self.summary(result.run_id, result)
+        return runner.run(scenario, mode, configuration)
 
     def summary(self, run_id: int, result: ExperimentResult | None = None) -> RunResponse:
+        self.authorize(run_id)
         result = result or self.store.result_for(run_id)
         scores = (result.investigation or {}).get('scores')
         correct = scores.get('decision_correctness') if scores else result.recommendation_correctness

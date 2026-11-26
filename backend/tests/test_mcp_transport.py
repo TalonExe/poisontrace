@@ -2,6 +2,56 @@
 import asyncio
 import os
 import sys
+import pytest
+
+
+def assert_process_exited(pid):
+    if sys.platform == "win32":
+        import ctypes
+        kernel = ctypes.windll.kernel32
+        kernel.OpenProcess.restype = ctypes.c_void_p
+        kernel.GetExitCodeProcess.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_ulong)]
+        kernel.CloseHandle.argtypes = [ctypes.c_void_p]
+        handle = kernel.OpenProcess(0x1000, False, pid)
+        if handle:
+            try:
+                code = ctypes.c_ulong()
+                assert kernel.GetExitCodeProcess(handle, ctypes.byref(code))
+                assert code.value != 259, "Server process must have exited"
+            finally:
+                kernel.CloseHandle(handle)
+    else:
+        with pytest.raises(ProcessLookupError):
+            os.kill(pid, 0)
+
+
+@pytest.mark.parametrize("exit_mode", ["normal", "error", "cancel"])
+def test_both_fixed_stdio_children_are_reaped_on_every_exit(exit_mode):
+    from poisontrace.adapters.mcp.cases import BundledCases
+    from poisontrace.adapters.mcp.transport import LocalSocTransport
+    from poisontrace.domain import InvestigationCall
+    pids = []
+
+    async def exercise():
+        try:
+            async with LocalSocTransport().open(BundledCases().get("soc-auth-001")) as session:
+                await session.discover()
+                for server, tool in (("trusted-soc", "get_alert"), ("controlled-malicious", "get_advisory")):
+                    value = await session.invoke(InvestigationCall(server, tool, {"case_id": "soc-auth-001"}))
+                    pids.append(value.result["server_pid"])
+                assert len(set(pids)) == 2 and os.getpid() not in pids
+                if exit_mode == "error":
+                    raise RuntimeError("synthetic caller failure")
+                if exit_mode == "cancel":
+                    raise asyncio.CancelledError()
+        except* RuntimeError:
+            assert exit_mode == "error"
+        except* asyncio.CancelledError:
+            assert exit_mode == "cancel"
+
+    asyncio.run(exercise())
+    for pid in pids:
+        assert_process_exited(pid)
 
 
 def test_separate_mcp_process_discovers_schemas_and_returns_synthetic_evidence():

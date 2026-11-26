@@ -50,7 +50,7 @@ def test_scenario_service_does_not_depend_on_entrypoints():
         {"poisontrace.web", "poisontrace.web_adapter", "poisontrace.cli"}
     )
     assert not forbidden, f"scenario service imports entrypoints: {sorted(forbidden)}"
-    assert imports <= {"re", "typing", "poisontrace.application.ports"}
+    assert imports <= {"re", "typing", "poisontrace.application.ports", "poisontrace.application.content_policy"}
 
 
 def test_credential_application_and_ports_avoid_concrete_dependencies():
@@ -138,7 +138,7 @@ def test_model_adapters_depend_on_domain_not_application_or_composition():
 
 
 def test_persistence_adapters_do_not_depend_on_composition_or_legacy_modules():
-    allowed = {"poisontrace.domain", "poisontrace.application.ports", "poisontrace.application.accounts", "poisontrace.adapters.persistence.support"}
+    allowed = {"poisontrace.domain", "poisontrace.application.ports", "poisontrace.application.accounts", "poisontrace.application.principals", "poisontrace.adapters.persistence.support"}
     for path in (BACKEND_ROOT / "adapters/persistence").glob("*.py"):
         forbidden = {name for name in _python_imports(path)
                      if name.startswith("poisontrace.") and name not in allowed}

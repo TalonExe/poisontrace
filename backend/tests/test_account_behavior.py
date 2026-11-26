@@ -43,7 +43,9 @@ def test_account_session_hashes_reopen_logout_and_reenable(tmp_path, monkeypatch
     with pytest.raises(AuthenticationError):
         service.current_user(token)
     reopened.update_user(user.id, status="active")
-    assert service.current_user(token).id == user.id
+    with pytest.raises(AuthenticationError):
+        service.current_user(token)
+    _, token = service.authenticate("new.user", "synthetic-passcode")
     service.logout(token)
     service.logout(None)
     with pytest.raises(AuthenticationError):

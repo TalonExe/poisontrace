@@ -1,3 +1,4 @@
+from job_helpers import complete_investigation
 import pytest
 from poisontrace.bootstrap import build_backend, create_app
 from poisontrace.config import WebConfig
@@ -5,7 +6,8 @@ from poisontrace.config import WebConfig
 
 def test_ground_truth_editor_versions_validation_and_scored_saved_run(tmp_path, analyst_client):
     config = WebConfig(scenario_dir=tmp_path/'scenarios', database=tmp_path/'runs.db')
-    client = analyst_client(create_app(build_backend(config)))
+    backend = build_backend(config)
+    client = analyst_client(create_app(backend))
     path = '/api/runs/investigation-cases/soc-auth-001'
     case = client.get(path)
     assert case.status_code == 200, case.text
@@ -19,7 +21,7 @@ def test_ground_truth_editor_versions_validation_and_scored_saved_run(tmp_path, 
     assert saved.status_code == 200, saved.text
     assert saved.json()['case_version'] == '2'
     assert client.put(path,json=change).status_code == 400
-    run = client.post('/api/runs',json={'workflow':'mcp-investigation-v1','case_id':'soc-auth-001','mode':'clean','provider':'scripted'}).json()
+    run = complete_investigation(client, backend, {'workflow':'mcp-investigation-v1','case_id':'soc-auth-001','mode':'clean','provider':'scripted'}).json()
     detail = client.get(f"/api/runs/{run['run_id']}").json()
     assert detail['scoring_version'] == 'investigation-scoring-v1'
     assert detail['investigation']['scores']['verdict_correctness'] is True
@@ -121,3 +123,7 @@ def test_missing_attack_ground_truth_is_not_inferred_from_payload_or_wrong_decis
     result = runner.run('soc-auth-001',{'mode':'poisoned','attack_family':'description-poisoning'})
     assert result.attacker_goal_achievement is None
     assert result.investigation['attacker_predicate'] is None
+
+
+# Direct application reopening uses an explicit trusted analyst.
+pytestmark = pytest.mark.usefixtures("application_analyst")

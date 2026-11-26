@@ -2,7 +2,7 @@ import json
 import os
 from typing import Any
 
-from openai import OpenAI
+from openai import APITimeoutError, OpenAI
 
 from poisontrace.domain import AgentDecision, Scenario, ToolCall, ToolDefinition
 
@@ -26,11 +26,17 @@ DECISION_SCHEMA = {
 
 class OpenAIModel:
     def __init__(self, client: Any | None = None, model_name: str = "gpt-5-mini", api_key: str | None = None) -> None:
-        self.client = client or OpenAI(api_key=api_key or os.environ["OPENAI_API_KEY"])
+        self.client = client or OpenAI(api_key=api_key or os.environ["OPENAI_API_KEY"], timeout=20, max_retries=0)
         self.model_name = model_name
 
     def respond(self, scenario: Scenario, tools: tuple[ToolDefinition, ...]) -> AgentDecision:
         tool_text = "\n".join(f"- {tool.name}: {tool.description}" for tool in tools)
+        try:
+            return self._respond(scenario, tool_text)
+        except APITimeoutError:
+            raise TimeoutError from None
+
+    def _respond(self, scenario: Scenario, tool_text: str) -> AgentDecision:
         response = self.client.responses.create(
             model=self.model_name,
             input=(

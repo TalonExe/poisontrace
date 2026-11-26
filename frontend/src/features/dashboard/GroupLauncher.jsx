@@ -1,17 +1,60 @@
-import React, { useEffect, useState } from "react";
+import { ExecutionSelection } from "./ExecutionSelection";
+import { CaseOptions } from "./CaseOptions";
+import { observeInvestigationJobs } from "./investigationJobObserver";
+import {
+  executionModels as models,
+  resolveExecution,
+} from "../../utils/executionSelection";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 
-const models = {
-  scripted: "scripted-soc-v2",
-  gemini: "gemini-3.5-flash-lite",
-  openai: "gpt-5-mini",
-};
+import { workspaceStorage } from "../../utils/workspaceStorage";
+import { useContentReadOnly } from "../../components/ContentPolicy";
+import { PendingButton } from "../../components/common/PendingButton";
+
 const conditions = ["clean", "poisoned", "defended"];
 
-export function GroupLauncher({ runner, session, onResults, onRunningChange }) {
+export function GroupLauncher({
+  runner,
+  selection,
+  onSelectionChange,
+  executionOptions,
+  onResults,
+  onRunningChange,
+  onRunStart,
+}) {
+  const storage = useMemo(() => workspaceStorage(window.localStorage), []);
+  const mounted = useRef(true);
+  const inFlight = useRef(false);
+  const readOnly = useContentReadOnly();
+  const [pending, setPending] = useState(() => {
+    try { return JSON.parse(storage.getItem('group-intent') || 'null'); }
+    catch { return null; }
+  });
+  const [submission, setSubmission] = useState(null);
+  const [job, setJob] = useState(null);
+  const [progress, setProgress] = useState(null);
+  const retain = (value) => {
+    storage.setItem('group-intent', JSON.stringify(value));
+    setPending(value);
+  };
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  useEffect(() => observeInvestigationJobs({
+    runner,
+    kind: "group",
+    onUpdate: ({ job: current, busy, progress: currentProgress }) => {
+      setJob(current);
+      setProgress(currentProgress);
+      setRunning(busy);
+      onRunningChange(busy);
+    },
+    onError: (error) => setError(error.message),
+  }), [runner, onRunningChange]);
   const [cases, setCases] = useState([]);
   const [groups, setGroups] = useState([]);
   const [caseId, setCaseId] = useState("");
-  const [provider, setProvider] = useState("scripted");
   const [family, setFamily] = useState("cross-server-shadowing");
   const [schedule, setSchedule] = useState(conditions);
   const [repeats, setRepeats] = useState("1");
@@ -44,10 +87,15 @@ export function GroupLauncher({ runner, session, onResults, onRunningChange }) {
   const saved = groups.find((g) => g.group_id === groupId);
   const selected = cases.find((c) => c.case_id === caseId);
   const allocated = Boolean(selected?.attacks?.length);
-  const actualProvider = saved?.plan.provider || provider;
-  const validCredential =
-    actualProvider === "scripted" ||
-    (session.model === actualProvider && Boolean(session.credentialId));
+  const execution = resolveExecution(
+    selection,
+    executionOptions.configurations,
+    executionOptions.credentials,
+    saved?.plan,
+  );
+  const provider = execution.provider;
+  const actualProvider = provider;
+  const validCredential = execution.valid;
   const count = saved
     ? saved.plan.repeats * saved.plan.conditions.length
     : Number(repeats) * schedule.length;
@@ -58,40 +106,68 @@ export function GroupLauncher({ runner, session, onResults, onRunningChange }) {
       Number.isInteger(Number(repeats)) &&
       Number(repeats) > 0 &&
       (!schedule.some((c) => c !== "clean") || allocated));
-  async function launch(event) {
-    event.preventDefault();
+  async function submit(value, source) {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    const reportRun = onRunStart("group");
+    retain(value);
+    setSubmission(source);
     setRunning(true);
     onRunningChange(true);
     setError("");
     try {
-      const credential =
-        actualProvider === "scripted"
-          ? {}
-          : { credential_id: session.credentialId };
-      const group = saved
-        ? await runner.executeRunGroup(groupId, credential)
-        : await runner.createRunGroup({
-            case_id: caseId,
-            case_version: selected.case_version,
-            provider,
-            ...(provider === "scripted" ? {} : { model: models[provider] }),
-            ...credential,
-            conditions: schedule,
-            repeats: Number(repeats),
-            ...(schedule.some((c) => c !== "clean")
-              ? { attack_family: family }
-              : {}),
-          });
-      onResults(`/results/groups/${group.group_id}`);
+      const accepted = value.groupId
+        ? await runner.executeRunGroup(value.groupId, value.payload, value.intent)
+        : await runner.createRunGroup(value.payload, value.intent);
+      reportRun(accepted);
+      if (!mounted.current) return;
+      retain(null);
+      setJob(accepted);
+      onResults(`/results/groups/${accepted.group_id}`);
     } catch (e) {
+      reportRun(null, e.message);
+      if (!mounted.current) return;
       setError(e.message);
+      if ([400, 404, 409, 422].includes(e.status)) retain(null);
     } finally {
-      setRunning(false);
-      onRunningChange(false);
+      inFlight.current = false;
+      if (mounted.current) {
+        setSubmission(null);
+        setRunning(false);
+        onRunningChange(false);
+      }
     }
+  }
+  async function launch(event) {
+    event.preventDefault();
+    if (running || loading || pending || !valid || !validCredential) return;
+    const credential = actualProvider === "scripted" ? {} : { credential_id: execution.credentialId };
+    const payload = saved ? credential : {
+      case_id: caseId,
+      case_version: selected.case_version,
+      provider,
+      ...(provider === "scripted" ? {} : { model: execution.model }),
+      ...credential,
+      conditions: schedule,
+      repeats: Number(repeats),
+      ...(schedule.some(c => c !== "clean") ? { attack_family: family } : {}),
+    };
+    await submit({intent: crypto.randomUUID(), groupId: saved ? groupId : null, payload}, "launch");
   }
   return (
     <form className="group-launcher" onSubmit={launch}>
+      {((pending && submission !== "launch") || job) && <article className="card group-job-status" aria-label="Matched group job" role="status">
+        {job && <>
+          <p><strong>Matched group {job.status}.</strong> <span className="group-job-id">Job {job.job_id}</span></p>
+          {progress && <p><strong>{progress.completed} completed</strong>, {progress.failed} failed, {progress.interrupted} interrupted, {progress.missing} missing, {progress.queued} queued, {progress.active} active.</p>}
+          <button className="small-button" type="button" onClick={() => onResults(`/results/groups/${job.group_id}`)}>Open group progress and Results</button>
+          {job.status === 'interrupted' && <p>The provider outcome is uncertain. No attempt will replay automatically. An explicit rerun adds new attempts and may incur new provider charges.</p>}
+        </>}
+        {pending && submission !== "launch" && <>
+          <p>{submission === "retry" ? "Retrying the saved submission…" : "The submission response is uncertain. Retry the saved submission intent to recover its job before starting different work."}</p>
+          <PendingButton className="small-button" type="button" pending={submission === "retry"} onPress={() => submit(pending, "retry")}>Retry group submission</PendingButton>
+        </>}
+      </article>}
       <article className="card">
         <h2>Matched group setup</h2>
         <p>
@@ -111,7 +187,8 @@ export function GroupLauncher({ runner, session, onResults, onRunningChange }) {
             </button>
           </div>
         )}
-        <fieldset disabled={running || loading} className="group-fields">
+        {readOnly && <p>Hosted groups allow one repeat and up to three unique conditions. Larger saved local schedules cannot run here.</p>}
+        <fieldset disabled={running || loading || Boolean(pending)} className="group-fields">
           <legend>Group inputs</legend>
           <label className="field">
             Group source
@@ -128,6 +205,13 @@ export function GroupLauncher({ runner, session, onResults, onRunningChange }) {
               ))}
             </select>
           </label>
+          <ExecutionSelection
+            selection={selection}
+            onChange={onSelectionChange}
+            options={executionOptions}
+            required={saved?.plan}
+            disabled={running || loading || Boolean(pending)}
+          />
           {!saved && (
             <>
               <label className="field">
@@ -142,25 +226,10 @@ export function GroupLauncher({ runner, session, onResults, onRunningChange }) {
                     setSchedule(next?.attacks?.length ? conditions : ["clean"]);
                   }}
                 >
-                  {cases.map((c) => (
-                    <option key={c.case_id} value={c.case_id}>
-                      {c.name} · v{c.case_version} · {c.dataset_category}
-                    </option>
-                  ))}
+                  <CaseOptions cases={cases} />
                 </select>
               </label>
               {!loading && !cases.length && <p>No research cases available.</p>}
-              <label className="field">
-                Group provider
-                <select
-                  value={provider}
-                  onChange={(e) => setProvider(e.target.value)}
-                >
-                  <option value="scripted">Scripted offline</option>
-                  <option value="gemini">Gemini</option>
-                  <option value="openai">OpenAI</option>
-                </select>
-              </label>
               <fieldset className="condition-schedule">
                 <legend>Condition schedule</legend>
                 <p>Execution order follows the list below, once per repeat.</p>
@@ -210,6 +279,7 @@ export function GroupLauncher({ runner, session, onResults, onRunningChange }) {
                 <input
                   type="number"
                   min="1"
+                  max={readOnly ? "1" : undefined}
                   step="1"
                   required
                   value={repeats}
@@ -260,7 +330,7 @@ export function GroupLauncher({ runner, session, onResults, onRunningChange }) {
             {actualProvider === "scripted"
               ? "No key used"
               : validCredential
-                ? "Selected configuration's private reference"
+                ? "Selected execution's private reference"
                 : "Matching provider credential required"}
           </dd>
         </dl>
@@ -273,26 +343,28 @@ export function GroupLauncher({ runner, session, onResults, onRunningChange }) {
         )}
         {!validCredential && (
           <p role="status">
-            Choose a configuration with a {actualProvider} credential before
-            running.
+            Select a matching configuration above or reload execution options
+            before running.
           </p>
         )}
-        <button
+        <PendingButton
           className="run-button"
-          disabled={running || loading || !valid || !validCredential}
+          type="submit"
+          pending={submission === "launch"}
+          disabled={running || loading || Boolean(pending) || !valid || !validCredential}
         >
-          {running
+          {running && !submission
             ? "Group running…"
             : saved
               ? "Rerun matched group"
               : "Run matched group"}
-        </button>
-        {running && (
+        </PendingButton>
+        {submission === "launch" && (
           <p role="status">
-            Running {count} attempts. Results opens when this request finishes.
-            Do not submit another group while waiting.
+            Submitting a durable schedule of {count} attempts. Progress is saved and can be reopened after leaving this page.
           </p>
         )}
+        {running && !submission && <p>Follow the accepted job in progress or Results.</p>}
       </aside>
     </form>
   );

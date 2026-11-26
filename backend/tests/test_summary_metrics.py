@@ -1,3 +1,4 @@
+import pytest
 from poisontrace.bootstrap import build_backend, create_app
 from poisontrace.config import WebConfig
 from poisontrace.domain import AgentDecision, ExperimentMode, ExperimentResult, Scenario
@@ -37,3 +38,7 @@ def test_false_positive_uses_incident_trust_independently_of_gateway_manifest(tm
     metrics = calculate_metrics([result])
     assert metrics.false_positive_rate == 1
     assert metrics.by_condition['clean']['inappropriate_clean_block']['denominator'] == 1
+
+
+# Trusted caller for direct application checks; HTTP still authenticates independently.
+pytestmark = pytest.mark.usefixtures("application_analyst")

@@ -1,3 +1,4 @@
+from job_helpers import complete_investigation
 import asyncio
 import json
 from types import SimpleNamespace
@@ -51,7 +52,7 @@ def test_gemini_selected_model_and_private_reference_survive_saved_http_result(t
     config = WebConfig(scenario_dir=tmp_path / 'scenarios', database=tmp_path / 'runs.db')
     backend = build_backend(config, Secrets(), investigation_model_factory=factory)
     client = analyst_client(create_app(backend))
-    response = client.post('/api/runs', json={'workflow': 'mcp-investigation-v1', 'case_id': 'soc-auth-001',
+    response = complete_investigation(client, backend, {'workflow': 'mcp-investigation-v1', 'case_id': 'soc-auth-001',
         'mode': 'clean', 'provider': 'gemini', 'model': 'chosen-gemini', 'credential_id': 'private-ref'})
     assert response.status_code == 200, response.text
     assert response.json()['status'] == 'completed'
@@ -139,7 +140,7 @@ def test_gemini_sdk_substitute_continues_from_real_mcp_and_reopens(tmp_path, ana
     config = WebConfig(scenario_dir=tmp_path/'scenarios', database=tmp_path/'runs.db')
     backend = build_backend(config, Secrets(), investigation_model_factory=factory)
     http = analyst_client(create_app(backend))
-    result = http.post('/api/runs', json=dict(workflow='mcp-investigation-v1',case_id='soc-auth-001',mode='defended' if defended else 'poisoned' if family else 'clean',attack_family=family,provider='gemini',model='selected-gemini',credential_id='test-ref')).json()
+    result = complete_investigation(http, backend, dict(workflow='mcp-investigation-v1',case_id='soc-auth-001',mode='defended' if defended else 'poisoned' if family else 'clean',attack_family=family,provider='gemini',model='selected-gemini',credential_id='test-ref')).json()
     assert result['status'] == 'completed'
     assert len(requests) == 2
     assert all(r['model'] == 'selected-gemini' for r in requests)
@@ -161,3 +162,7 @@ def test_runner_closes_provider_after_failure_and_retains_selected_model(tmp_pat
     assert closed == [True]
     runner, _ = runner_for(tmp_path, lambda: (_ for _ in ()).throw(RuntimeError('initialization failure')))
     assert runner.run('soc-auth-001', {'provider':'gemini','model':'selected-gemini'}).model_name == 'selected-gemini'
+
+
+# Direct application reopening uses an explicit trusted analyst.
+pytestmark = pytest.mark.usefixtures("application_analyst")

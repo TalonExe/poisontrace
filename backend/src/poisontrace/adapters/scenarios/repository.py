@@ -9,8 +9,9 @@ from poisontrace.adapters.scenarios.loader import load_scenario
 
 
 class YamlScenarioRepository:
-    def __init__(self, directory: Path):
+    def __init__(self, directory: Path, recovery_ledger=None):
         self.directory = directory
+        self.recovery_ledger = recovery_ledger
 
     def _read(self, path: Path) -> dict[str, Any]:
         document: Any = None
@@ -111,4 +112,7 @@ class YamlScenarioRepository:
         return self.get(str(document["scenario_id"]))
 
     def delete_filename(self, filename: str) -> None:
-        self._path(filename).unlink()
+        path = self._path(filename)
+        if self.recovery_ledger is not None and path.is_file():
+            self.recovery_ledger.delete_scenario(filename)
+        path.unlink()

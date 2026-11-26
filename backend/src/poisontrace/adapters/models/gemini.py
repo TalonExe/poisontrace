@@ -2,6 +2,8 @@ import json
 import os
 from typing import Any
 
+from httpx import TimeoutException
+
 from poisontrace.domain import AgentDecision, Scenario, ToolCall, ToolDefinition
 
 
@@ -28,15 +30,23 @@ class GeminiModel:
     def __init__(self, client: Any | None = None, model_name: str = "gemini-3.5-flash-lite", api_key: str | None = None) -> None:
         if client is None:
             from google import genai
+            from google.genai import types
 
-            client = genai.Client(api_key=api_key or os.environ["GEMINI_API_KEY"])
+            client = genai.Client(api_key=api_key or os.environ["GEMINI_API_KEY"],
+                http_options=types.HttpOptions(timeout=20_000, retry_options=types.HttpRetryOptions(attempts=1)))
         self.client = client
         self.model_name = model_name
 
     def respond(self, scenario: Scenario, tools: tuple[ToolDefinition, ...]) -> AgentDecision:
+        tool_text = "\n".join(f"- {tool.name}: {tool.description}" for tool in tools)
+        try:
+            return self._respond(scenario, tool_text)
+        except TimeoutException:
+            raise TimeoutError from None
+
+    def _respond(self, scenario: Scenario, tool_text: str) -> AgentDecision:
         from google.genai import types
 
-        tool_text = "\n".join(f"- {tool.name}: {tool.description}" for tool in tools)
         response = self.client.models.generate_content(
             model=self.model_name,
             contents=(

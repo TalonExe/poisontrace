@@ -6,6 +6,8 @@ This note records the research-backed structures for the deterministic poisoned
 scenario fixtures. The fixtures model indirect prompt injection in tool
 metadata, not real-world credential theft or external delivery.
 
+These guidelines describe the older YAML metadata smoke fixtures. Marker presence is an instruction-following observation, not current attacker-goal achievement. The MCP payload catalog and current scoring are defined in [MCP_PAYLOAD_REVISION_V2.md](MCP_PAYLOAD_REVISION_V2.md) and [CLEAN_MCP_INVESTIGATION.md](CLEAN_MCP_INVESTIGATION.md).
+
 ## Design guidance
 
 - Use several distinct structures rather than repeating one phrase: authority

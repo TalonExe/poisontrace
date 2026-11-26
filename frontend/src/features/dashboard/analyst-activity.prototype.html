@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoisonTrace · Analyst dashboard prototype</title>
+<style>
+* { box-sizing: border-box }
+:root { font: 15px/1.5 system-ui, sans-serif; color: #222920; background: #eff1ea; --green: #38644b; --light: #8eab77; --red: #a34b3a; --gray: #596456 }
+body { margin: 0 }
+header { background: #202c23; color: #f6f7ef; padding: 16px max(4vw, 18px); display: flex; align-items: center; gap: 24px; flex-wrap: wrap }
+header strong { font-size: 20px }
+header small { margin-left: auto; color: #d6dfcf }
+nav { display: flex; gap: 18px; color: #c8d2c4 }
+nav b { color: #fff; border-bottom: 2px solid #a9c995 }
+main { width: min(1140px, 92%); margin: 30px auto 100px }
+.heading, .controls { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap }
+h1 { margin: 0; font-size: clamp(29px, 5vw, 42px); line-height: 1.15; letter-spacing: -.045em }
+h2 { font-size: 18px; margin: 0 }
+p { margin: 5px 0; color: var(--gray) }
+button { font: inherit; background: #fff; color: inherit; border: 1px solid #bcc7b7; padding: 6px 12px; border-radius: 6px; cursor: pointer }
+button[aria-pressed="true"] { background: #38644b; border-color: #38644b; color: white }
+button:focus-visible, .column:focus-visible { outline: 3px solid #815d20; outline-offset: 3px }
+.period { display: flex; gap: 7px; align-items: center; flex-wrap: wrap }
+.date { min-width: 160px; text-align: center }
+.cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 23px 0 14px }
+.card, article { background: #fafbf6; border: 1px solid #d6ddd0; border-radius: 11px; padding: 17px }
+.card strong { display: block; font-size: 29px; letter-spacing: -.04em }
+.card span, .note { color: var(--gray); font-size: 13px }
+.charts { display: grid; grid-template-columns: 1.5fr 1fr; gap: 14px }
+.charts article { min-width: 0 }
+.charts header { all: unset; display: block; margin-bottom: 12px }
+.charts header strong { font-size: 18px }
+.wide { grid-column: 1 / -1 }
+.split { grid-template-columns: 1fr 1fr }
+.split .timeline { grid-column: 1 / -1; order: 2 }
+.split .wide { order: 3 }
+.plot { height: 195px; display: flex; gap: 8px; align-items: stretch; margin: 12px 0 4px; background: repeating-linear-gradient(to top, transparent 0 39px, #e1e6db 39px 40px) center bottom 25px / 100% 160px no-repeat }
+.column { flex: 1; display: grid; grid-template-rows: 1fr 24px; text-align: center; min-width: 0; font-size: 12px }
+.stack { align-self: end; display: flex; flex-direction: column; justify-content: flex-end; width: min(43px, 75%); margin: 0 auto; height: 154px; gap: 1px }
+.segment { display: block; min-height: 0; background: var(--green) }
+.failed { background: var(--red) }
+.alt { background: var(--light) }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px }
+.row { display: grid; grid-template-columns: 95px 1fr auto; align-items: center; gap: 9px; margin: 13px 0; font-size: 13px }
+.track { background: #e6ebdf; border-radius: 3px; height: 10px }
+.fill { height: 100%; background: var(--green); border-radius: inherit }
+footer { position: fixed; inset: auto 0 0; background: #f7f8f2; border-top: 1px solid #d6ddd0; display: flex; justify-content: center; align-items: center; gap: 8px; padding: 10px; flex-wrap: wrap; font-size: 13px }
+@media (max-width: 700px) { .cards { grid-template-columns: 1fr 1fr } .charts, .split { grid-template-columns: 1fr } .heading { align-items: flex-start } header small { margin-left: 0 } }
+</style>
+<header>
+  <strong>PoisonTrace</strong>
+  <nav aria-label="Analyst workspace preview"><b aria-current="page">Dashboard</b><span>Experiment</span><span>Results</span></nav>
+  <small>Prototype · Sample data</small>
+</header>
+<main>
+  <div class="heading">
+    <div><h1>Analyst dashboard</h1><p>Your investigation activity <span id="zone"></span></p></div>
+    <div class="period" aria-label="Reporting period">
+      <button id="week">Week</button><button id="month">Month</button>
+      <button id="previous" aria-label="Previous period">‹</button>
+      <strong id="date" class="date" aria-live="polite"></strong>
+      <button id="next" aria-label="Next period">›</button>
+    </div>
+  </div>
+  <section id="cards" class="cards" aria-label="Period totals"></section>
+  <section id="charts" class="charts" aria-label="Period charts"></section>
+</main>
+<footer>
+  <span>Preview layout</span>
+  <button id="activity">Activity first</button>
+  <button id="model">Models and outcomes first</button>
+</footer>
+<script>
+const get = id => document.getElementById(id);
+const day = (year, month, date) => new Date(Date.UTC(year, month, date));
+const start = day(2026, 10, 23);
+const shift = (date, days) => day(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + days);
+const short = date => date.toLocaleDateString('en', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+const modelNames = ['OpenAI', 'Gemini', 'Scripted'];
+const records = Array.from({ length: 90 }, (_, i) => {
+  const completed = (i * 17 % 13) < 8 ? (i * 7 % 11) : 0;
+  const failed = Number(i % 8 === 0);
+  return {
+    date: shift(day(2026, 8, 1), i),
+    completed, failed,
+    groups: Math.min(Math.floor(completed / 3), i % 3),
+    reruns: Number(completed >= 3 && i % 6 === 0),
+    interrupted: Number(i % 17 === 0),
+    provider: i % 3
+  };
+});
+const total = (rows, field) => rows.reduce((sum, row) => sum + row[field], 0);
+const attempts = rows => total(rows, 'completed') + total(rows, 'failed');
+const months = new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+const params = new URLSearchParams(location.search);
+let view = params.get('layout') === 'model' ? 'model' : 'activity';
+let period = 'week';
+let offset = 0;
+const legend = items => '<div class="legend">' + items.map(([label, color]) => '<span><i style="background:' + color + '"></i>' + label + '</span>').join('') + '</div>';
+const fieldClasses = { failed: 'failed', reruns: 'alt' };
+const chart = (buckets, fields, labels) => {
+  const max = Math.max(1, ...buckets.map(bucket => fields.reduce((sum, field) => sum + total(bucket.rows, field), 0)));
+  return '<div class="plot">' + buckets.map(bucket => {
+    const values = fields.map(field => total(bucket.rows, field));
+    const label = bucket.range + ' • ' + values.map((value, index) => value + ' ' + labels[index]).join(', ');
+    return '<div class="column" tabindex="0" title="' + label + '" aria-label="' + label + '"><div class="stack" aria-hidden="true">' +
+      values.map((value, index) => '<span class="segment ' + (fieldClasses[fields[index]] || '') + '" style="height:' + (value / max * 135) + 'px"></span>').join('') +
+      '</div><span>' + bucket.label + '</span></div>';
+  }).join('') + '</div>';
+};
+const bar = (label, value, max) => '<div class="row"><span>' + label + '</span><div class="track" aria-hidden="true"><div class="fill" style="width:' + (value / Math.max(1, max) * 100) + '%"></div></div><strong>' + value + '</strong></div>';
+const card = (label, number, detail) => '<div class="card"><span>' + label + '</span><strong>' + number + '</strong><span>' + detail + '</span></div>';
+function render() {
+  const first = period === 'week' ? shift(start, offset * 7) : day(2026, 10 + offset, 1);
+  const end = period === 'week' ? shift(first, 7) : day(first.getUTCFullYear(), first.getUTCMonth() + 1, 1);
+  const rows = records.filter(row => row.date >= first && row.date < end);
+  const buckets = [];
+  for (let from = first; from < end; from = shift(from, period === 'week' ? 1 : 7)) {
+    const until = new Date(Math.min(+end, +shift(from, period === 'week' ? 1 : 7)));
+    buckets.push({ range: short(from) + ' to ' + short(shift(until, -1)), label: period === 'week' ? from.toLocaleDateString('en', { weekday: 'short', timeZone: 'UTC' }) : short(from), rows: rows.filter(row => row.date >= from && row.date < until) });
+  }
+  get('date').textContent = period === 'month' ? months.format(first) : short(first) + ' – ' + short(shift(end, -1));
+  get('zone').textContent = '· UTC';
+  get('cards').innerHTML = card('Saved attempts', attempts(rows), total(rows, 'completed') + ' completed · ' + total(rows, 'failed') + ' failed') +
+    card('Groups created', total(rows, 'groups'), 'New matched plans') +
+    card('Group reruns', total(rows, 'reruns'), 'Submitted against saved plans') +
+    card('Interrupted jobs', total(rows, 'interrupted'), 'Provider outcome may be unknown');
+  get('charts').className = 'charts' + (view === 'model' ? ' split' : '');
+  get('charts').innerHTML =
+    '<article class="timeline"><h2>Saved attempts over time</h2><p>Standalone and matched-group investigations</p>' +
+    chart(buckets, ['failed', 'completed'], ['failed', 'completed']) +
+    legend([['Completed', 'var(--green)'], ['Failed', 'var(--red)']]) + '</article>' +
+    '<article><h2>Attempts by provider</h2><p>Saved attempts, including failures</p>' +
+    modelNames.map((name, i) => bar(name, attempts(rows.filter(row => row.provider === i)), Math.max(...modelNames.map((_, index) => attempts(rows.filter(row => row.provider === index)))))).join('') +
+    '<p class="note">Token usage is unavailable in existing records.</p></article>' +
+    '<article class="' + (view === 'activity' ? 'wide' : '') + '"><h2>Matched-group activity</h2><p>New plans and explicit reruns submitted in the period</p>' +
+    chart(buckets, ['groups', 'reruns'], ['groups created', 'reruns submitted']) + legend([['Groups created', 'var(--green)'], ['Reruns submitted', 'var(--light)']]) + '</article>';
+  for (const id of ['week', 'month', 'activity', 'model']) get(id).setAttribute('aria-pressed', id === period || id === view);
+}
+for (const id of ['week', 'month']) get(id).onclick = () => { period = id; offset = 0; render(); };
+get('previous').onclick = () => { offset--; render(); };
+get('next').onclick = () => { offset++; render(); };
+for (const id of ['activity', 'model']) get(id).onclick = () => {
+  view = id;
+  params.set('layout', id);
+  try { history.replaceState(null, '', '?' + params); } catch { }
+  render();
+};
+render();
+</script>
+</html>

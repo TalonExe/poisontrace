@@ -1,5 +1,7 @@
 # Public demonstration and local distribution
 
+Current implementation and verification are recorded in [STATUS.md](../STATUS.md). Dated deferrals and implementation-pending notes below describe adoption context.
+
 Status: accepted, 2026-11-03. Deployment requirements are accepted; implementation is pending.
 
 PoisonTrace will support a publicly hosted demonstration with live model execution using each analyst's own provider API key, alongside an open-source local edition. The first hosted release uses operator-issued accounts, private analyst credentials and experiment history, and a curated read-only scenario library. This avoids adding public registration and prevents visitors from modifying each other's benchmark inputs. The local edition retains scenario creation, repair and deletion under ADR 0001.

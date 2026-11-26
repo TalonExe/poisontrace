@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./verification-test.js";
 
 test.beforeEach(async ({ page }) => {
   let authenticated = false;
@@ -24,10 +24,12 @@ test.beforeEach(async ({ page }) => {
 
 async function signIn(page) {
   await page.getByLabel("Username").fill("analyst");
-  await page.getByLabel("Local passcode").fill("synthetic-only");
+  await page.getByLabel("Passcode").fill("synthetic-only");
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page).toHaveURL(/\/activity$/);
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
   await expect(
-    page.getByRole("heading", { name: "Configurations" }),
+    page.getByRole("heading", { name: "Settings" }),
   ).toBeVisible();
 }
 
@@ -55,15 +57,16 @@ test("sidebar navigates to scenarios and back to sessions", async ({
   page,
 }) => {
   await signIn(page);
-  await page.getByRole("button", { name: /Scenarios/ }).click();
+  await page.locator(".workspace-navigation summary").click();
+  await page.getByRole("button", { name: "Metadata scenarios (YAML)", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Scenario library" }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Configurations", exact: true })
+    .getByRole("button", { name: "Settings", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Configurations" }),
+    page.getByRole("heading", { name: "Settings" }),
   ).toBeVisible();
 });
 
@@ -85,7 +88,7 @@ test("credential selector displays masked references without plaintext secrets",
   await signIn(page);
   await page.getByRole("button", { name: /Edit/ }).first().click();
   await expect(
-    page.locator(".credential-row").getByText("Research · ••••1234"),
+    page.getByRole("region", { name: "API keys" }).getByText("Gemini ••••1234"),
   ).toBeVisible();
   const credentialSelect = page
     .locator("select")

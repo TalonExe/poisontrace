@@ -4,6 +4,14 @@ import pytest
 
 
 @pytest.fixture
+def application_analyst():
+    """Explicit trusted application caller for synthetic non-HTTP tests."""
+    from poisontrace.application.principals import Principal, principal_scope
+    with principal_scope(Principal(1, 'analyst')):
+        yield
+
+
+@pytest.fixture
 def analyst_client(monkeypatch):
     from fastapi.testclient import TestClient
 

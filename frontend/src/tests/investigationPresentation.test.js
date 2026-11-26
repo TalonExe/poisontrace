@@ -134,3 +134,10 @@ test("incompatible and missing slots never inflate the denominator; retained rer
   assert.equal(groupPerformance(rerun).score, 33);
   assert.equal(groupPerformance(rerun).attempts, 3);
 });
+
+test('reference membership uses membership wording without calling reasoning correct',()=>{
+  const presentation=investigationMeasurementPresentation('evidence_references_valid',observed(2,3));
+  assert.equal(presentation.positiveText,'2 with references found');
+  assert.equal(presentation.negativeText,'1 with invalid or missing references');
+  assert.equal(presentation.tone,'negative');
+});

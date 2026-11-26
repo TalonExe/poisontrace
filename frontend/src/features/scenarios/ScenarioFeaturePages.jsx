@@ -1,4 +1,7 @@
+import { useContentReadOnly, readOnlyContentMessage } from "../../components/ContentPolicy";
 import React, { useEffect, useState } from "react";
+import { ConfirmationAction } from "../../components/common/ConfirmationAction";
+import { PendingButton } from "../../components/common/PendingButton";
 
 export function ScenarioLibrary({
   adapter,
@@ -7,6 +10,7 @@ export function ScenarioLibrary({
   onDashboard,
   onSignOut,
 }) {
+  const readOnly = useContentReadOnly();
   const [items, setItems] = useState([]);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState([]);
@@ -20,57 +24,44 @@ export function ScenarioLibrary({
     setSelected((value) =>
       value.includes(id) ? value.filter((item) => item !== id) : [...value, id],
     );
+  const targets = items.filter(item => selected.includes(item.scenario_id || item.filename));
   const removeSelected = async () => {
-    const targets = items.filter((item) =>
-      selected.includes(item.scenario_id || item.filename),
-    );
-    const filenames = targets.map((item) => item.filename).join(", ");
-    if (
-      !targets.length ||
-      !window.confirm(
-        `Delete scenario file${targets.length === 1 ? "" : "s"} ${filenames}?`,
-      )
-    )
-      return;
-    try {
-      await Promise.all(
-        targets.map((item) =>
-          adapter.deleteScenario(item.scenario_id || item.filename),
-        ),
-      );
-      setItems(
-        items.filter(
-          (item) => !selected.includes(item.scenario_id || item.filename),
-        ),
-      );
-      setSelected([]);
-      setError("");
-    } catch (err) {
-      setError(err.message);
-    }
+    const ids = targets.map(item => item.scenario_id || item.filename);
+    const outcomes = await Promise.allSettled(ids.map(id => adapter.deleteScenario(id)));
+    const deleted = new Set(ids.filter((_, index) => outcomes[index].status === "fulfilled"));
+    const failure = outcomes.find(outcome => outcome.status === "rejected");
+    setItems(current => current.filter(item => !deleted.has(item.scenario_id || item.filename)));
+    setSelected(current => current.filter(id => !deleted.has(id)));
+    if (failure) throw failure.reason;
+    setError("");
   };
   return (
     <main className="app-shell">
       <section className="welcome">
         <div>
           <h1>Scenario library</h1>
-          <p>Only valid scenarios can be used for runs and campaigns.</p>
+          <p>YAML metadata scenarios for metadata runs and campaigns. Only valid scenarios can be used.</p>
         </div>
         <div>
-          <button className="run-button" onClick={onNew}>
+          {readOnly ? <p>{readOnlyContentMessage}</p> : <button className="run-button" onClick={onNew}>
             New scenario ↗
-          </button>
-          {selected.length > 0 && (
-            <button className="text-button" onClick={removeSelected}>
+          </button>}
+          {!readOnly && selected.length > 0 && (
+            <ConfirmationAction
+              title={targets.length === 1 ? "Delete selected scenario file?" : "Delete selected scenario files?"}
+              description={targets.map(item => item.filename).join(", ")}
+              confirmLabel={targets.length === 1 ? "Delete file" : "Delete files"}
+              onConfirm={removeSelected}
+            >
               Delete selected ({selected.length})
-            </button>
+            </ConfirmationAction>
           )}
         </div>
       </section>
       <section className="card scenario-library">
         <div className="card-head">
           <div>
-            <p className="label">Local definitions</p>
+            <p className="label">{readOnly ? "Curated definitions" : "Local definitions"}</p>
             <h2>{items.length} file{items.length === 1 ? "" : "s"}</h2>
           </div>
         </div>
@@ -80,18 +71,18 @@ export function ScenarioLibrary({
           </p>
         )}
         {!items.length && !error && (
-          <p className="empty-state">No scenarios loaded, make one.</p>
+          <p className="empty-state">{readOnly ? "No curated scenarios available." : "No scenarios loaded, make one."}</p>
         )}
         {items.map((item) => {
           const id = item.scenario_id || item.filename;
           return (
             <div className="scenario-row" key={item.filename}>
-              <input
+              {!readOnly && <input
                 type="checkbox"
                 aria-label={`Select ${item.filename} for deletion`}
                 checked={selected.includes(id)}
                 onChange={() => toggle(id)}
-              />
+              />}
               <button
                 className="scenario-row-content"
                 onClick={() => onOpen(id)}
@@ -129,7 +120,9 @@ export function ScenarioEditor({
   onDeleted,
   onSignOut,
 }) {
+  const readOnly = useContentReadOnly();
   const [draft, setDraft] = useState(null);
+  const [filename, setFilename] = useState("");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
@@ -143,11 +136,15 @@ export function ScenarioEditor({
           tools: [],
           approved_tools: [],
         })
-      : adapter.getScenario(scenarioId).then((item) => item.document || item)
+      : adapter.getScenario(scenarioId).then(item => {
+          setFilename(item.filename || "");
+          return item.document || item;
+        })
     )
       .then(setDraft)
       .catch((err) => setError(err.message));
   }, [adapter, scenarioId, isNew]);
+  if (readOnly && isNew) return <main className="app-shell"><section className="card"><h1>Scenario library</h1><p>{readOnlyContentMessage}</p><button className="text-button" onClick={onBack}>Back to library</button></section></main>;
   if (!draft)
     return (
       <main className="app-shell">
@@ -171,7 +168,7 @@ export function ScenarioEditor({
     );
   const save = async (event) => {
     event.preventDefault();
-    if (saving) return;
+    if (readOnly || saving) return;
     setSaving(true);
     setNotice("");
     try {
@@ -186,16 +183,6 @@ export function ScenarioEditor({
       setError(err.message);
     } finally { setSaving(false); }
   };
-  const remove = async () => {
-    const filename = draft.filename || `${scenarioId}.yaml`;
-    if (!window.confirm(`Delete scenario file ${filename}?`)) return;
-    try {
-      await adapter.deleteScenario(scenarioId);
-      onDeleted();
-    } catch (err) {
-      setError(err.message);
-    }
-  };
   const toolList = (list, label) => (
     <fieldset className="tool-list">
       <legend>{label}</legend>
@@ -204,6 +191,7 @@ export function ScenarioEditor({
           <label className="field">
             <span>Name</span>
             <input
+              readOnly={readOnly}
               value={tool.name || ""}
               onChange={(event) =>
                 editTool(list, index, "name", event.target.value)
@@ -213,6 +201,7 @@ export function ScenarioEditor({
           <label className="field">
             <span>Description</span>
             <textarea
+              readOnly={readOnly}
               rows="3"
               value={tool.description || ""}
               onChange={(event) =>
@@ -220,32 +209,31 @@ export function ScenarioEditor({
               }
             />
           </label>
-          <button
+          {!readOnly && <button
             type="button"
             className="text-button"
             onClick={() => removeTool(list, index)}
           >
             Remove tool
-          </button>
+          </button>}
         </div>
       ))}
-      <button
+      {!readOnly && <button
         type="button"
         className="text-button"
         onClick={() => addTool(list)}
       >
         + Add tool
-      </button>
+      </button>}
     </fieldset>
   );
   return (
     <main className="app-shell">
       <section className="welcome">
         <div>
-          <h1>{isNew ? "Create scenario" : "Edit scenario"}</h1>
+          <h1>{readOnly ? "Scenario details" : isNew ? "Create scenario" : "Edit scenario"}</h1>
           <p>
-            Edit discovered metadata and the separate trusted manifest used for
-            comparison.
+            {readOnly ? readOnlyContentMessage : "Edit discovered metadata and the separate trusted manifest used for comparison."}
           </p>
         </div>
       </section>
@@ -253,6 +241,7 @@ export function ScenarioEditor({
         <label className="field">
           <span>Name</span>
           <input
+            readOnly={readOnly}
             required
             value={draft.name || ""}
             onChange={(event) => update("name", event.target.value)}
@@ -267,6 +256,7 @@ export function ScenarioEditor({
         <label className="field">
           <span>Alert</span>
           <textarea
+            readOnly={readOnly}
             rows="3"
             value={draft.alert || ""}
             onChange={(event) => update("alert", event.target.value)}
@@ -274,12 +264,13 @@ export function ScenarioEditor({
         </label>
         <label className="field">
           <span>Attacker target recommendation (optional)</span>
-          <input value={draft.attacker_target_recommendation ?? ""} onChange={(event) => update("attacker_target_recommendation", event.target.value || null)} />
+          <input readOnly={readOnly} value={draft.attacker_target_recommendation ?? ""} onChange={(event) => update("attacker_target_recommendation", event.target.value || null)} />
           <small>Exact structured value, distinct from the expected recommendation. Leave empty for marker-only smoke cases; attacker goal remains unscored.</small>
         </label>
         <label className="field">
           <span>Expected recommendation</span>
           <input
+            readOnly={readOnly}
             value={draft.expected_recommendation || ""}
             onChange={(event) =>
               update("expected_recommendation", event.target.value)
@@ -294,13 +285,21 @@ export function ScenarioEditor({
           </p>
         )}
         {notice && <p role="status">{notice}</p>}
-        <button className="run-button" type="submit" disabled={saving}>
+        {!readOnly && <PendingButton className="run-button" type="submit" pending={saving}>
           Save scenario ↗
-        </button>
-        {!isNew && (
-          <button type="button" className="text-button" onClick={remove}>
+        </PendingButton>}
+        {saving && <p role="status">Saving scenario…</p>}
+        {!readOnly && !isNew && (
+          <ConfirmationAction
+            disabled={saving}
+            title="Delete scenario file?"
+            description={filename || draft.filename || `${scenarioId}.yaml`}
+            confirmLabel="Delete file"
+            onConfirm={() => adapter.deleteScenario(scenarioId)}
+            onSuccess={onDeleted}
+          >
             Delete scenario
-          </button>
+          </ConfirmationAction>
         )}
         <button type="button" className="text-button" onClick={onBack}>
           Back to library
