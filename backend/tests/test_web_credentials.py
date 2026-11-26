@@ -1,3 +1,6 @@
+import pytest
+pytestmark = pytest.mark.usefixtures("application_analyst")
+
 from cryptography.fernet import Fernet
 
 from poisontrace.adapters.secrets.storage import EncryptedSqliteSecrets
@@ -71,7 +74,7 @@ def test_credential_http_lifecycle_preserves_masking_and_error_mapping(tmp_path,
     assert client.get("/api/credentials").json() == []
     assert client.post(f"/api/credentials/{credential_id}/test").status_code == 404
     assert client.delete(f"/api/credentials/{credential_id}").status_code == 404
-    assert client.put(f"/api/credentials/{credential_id}", json={"provider": "openai", "secret": "replacement"}).status_code == 400
+    assert client.put(f"/api/credentials/{credential_id}", json={"provider": "openai", "secret": "replacement"}).status_code == 404
     assert client.post("/api/credentials", json={"provider": "openai", "secret": ""}).status_code == 400
 
 

@@ -4,10 +4,14 @@ import {
   resolveExecution,
 } from "../../utils/executionSelection";
 import { GroupLauncher } from "./GroupLauncher";
-import React, { useEffect, useState } from "react";
+import { CaseOptions } from "./CaseOptions";
+import { observeInvestigationJobs } from "./investigationJobObserver";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { workspaceStorage } from "../../utils/workspaceStorage";
 import { executionModes } from "../../utils/executionMode";
 import { CardHead, Icon, Select } from "../../components/common/Ui";
 import { Sidebar } from "../../components/layout/Sidebar";
+import { PendingButton } from "../../components/common/PendingButton";
 
 const modelOptions = {
   gemini: "Gemini API LLM",
@@ -21,6 +25,8 @@ const providerModels = {
   fake: "fake",
 };
 
+const sampleCaseId = "soc-backup-002";
+
 export function ExperimentDashboard({
   session,
   entry = "/dashboard",
@@ -29,16 +35,23 @@ export function ExperimentDashboard({
   onSignedOut,
   onScenarios,
   onResults,
+  onRunStart,
   user,
   auth,
   onSignOut,
 }) {
+  const storage = useMemo(() => workspaceStorage(window.localStorage), []);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
   const [executionSelection, setExecutionSelection] = useState(
-    () => window.localStorage.getItem(EXECUTION_STORAGE_KEY) || "scripted",
+    () => storage.getItem(EXECUTION_STORAGE_KEY) || "scripted",
   );
   const onExecutionChange = (selection) => {
     setExecutionSelection(selection);
-    window.localStorage.setItem(EXECUTION_STORAGE_KEY, selection);
+    storage.setItem(EXECUTION_STORAGE_KEY, selection);
   };
   const executionOptions = useExecutionOptions(runner);
   const execution = resolveExecution(
@@ -57,7 +70,16 @@ export function ExperimentDashboard({
   const [cases, setCases] = useState([]);
   const [caseId, setCaseId] = useState("");
   const [caseError, setCaseError] = useState("");
-  const [casesLoading, setCasesLoading] = useState(false);
+  const [casesLoading, setCasesLoading] = useState(true);
+  const [sampleSelected, setSampleSelected] = useState(false);
+  const sampleAvailable = cases.some((item) => item.case_id === sampleCaseId);
+  const prepareSample = () => {
+    setCaseId(sampleCaseId);
+    setCondition("clean");
+    setConditionReset(false);
+    setExecutionSelection("scripted");
+    setSampleSelected(true);
+  };
   const defended = condition === "defended";
   const attacked = condition !== "clean";
   const investigation = workflow === "MCP investigation";
@@ -66,7 +88,49 @@ export function ExperimentDashboard({
     .find((item) => item.case_id === caseId)
     ?.attacks?.find((item) => item.family === attackFamily);
   const investigationProvider = execution.provider;
-  const [running, setRunning] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const inFlight = useRef(false);
+  const [groupRunning, setGroupRunning] = useState(false);
+  const [job, setJob] = useState(null);
+  const [sampleResultId, setSampleResultId] = useState(null);
+  const savedRunButton = useRef(null);
+  useEffect(() => {
+    if (sampleResultId && job?.run_id === sampleResultId) savedRunButton.current?.focus();
+  }, [sampleResultId, job?.run_id]);
+  const running = groupMode ? groupRunning : submitting || job?.status === "queued" || job?.status === "active";
+  const jobKind = investigation ? "single" : entry === "/dashboard/campaign" ? "campaign" : "metadata";
+  const intentStorageKey = investigation ? "investigation-intent" : `${jobKind}-intent`;
+  const [pendingIntent, setPendingIntent] = useState(() => {
+    try { return JSON.parse(storage.getItem(intentStorageKey) || 'null'); }
+    catch { return null; }
+  });
+  const sampleRun = sampleSelected && caseId === sampleCaseId &&
+    condition === "clean" && execution.provider === "scripted";
+  const retainIntent = (value) => {
+    setPendingIntent(value);
+    storage.setItem(intentStorageKey, JSON.stringify(value));
+  };
+  const openJobResults = (current) => {
+    if (current.campaign_id) onResults(`/results/campaigns/${encodeURIComponent(current.campaign_id)}`);
+    else if (current.run_id) onResults(`/results/runs/${current.run_id}`);
+  };
+  useEffect(() => {
+    if (groupMode) return;
+    return observeInvestigationJobs({
+      runner,
+      kind: jobKind,
+      jobId: pendingIntent?.jobId,
+      onUpdate: ({ job: current, busy }) => {
+        setJob(current);
+        if (pendingIntent?.jobId === current.job_id && !busy) {
+          retainIntent(null);
+          if (!pendingIntent.sample) openJobResults(current);
+          else if (current.status === "completed") setSampleResultId(current.run_id);
+        }
+      },
+      onError: (error) => setLoadError(error.message),
+    });
+  }, [runner, jobKind, groupMode, pendingIntent?.jobId]);
   const executionMode =
     entry === "/dashboard/campaign"
       ? executionModes.campaign
@@ -150,23 +214,41 @@ export function ExperimentDashboard({
     };
   }, [runner, executionMode]);
   const startRun = async () => {
+    if (running || inFlight.current) return;
     if (investigation && (!execution.valid || !caseId || (attacked && !attack)))
       return;
-    setRunning(true);
+    inFlight.current = true;
+    const reportRun = investigation ? onRunStart("single") : null;
+    setSubmitting(true);
+    setSampleResultId(null);
     setLoadError("");
     try {
       if (executionMode === executionModes.campaign) {
         const model = providerModels[session?.model];
-        const campaign = await runner.runCampaign({
+        const campaign = pendingIntent?.campaign || await runner.createCampaign({
           provider: session?.model,
           model,
           credentialId: session.credentialId,
         });
-        onResults(
-          `/results/campaigns/${encodeURIComponent(campaign.campaign_id)}`,
-        );
+        if (!mounted.current) return;
+        const intent = pendingIntent?.intent || crypto.randomUUID();
+        const excludedFiles = campaign.excluded_files || [];
+        retainIntent({ intent, campaign });
+        if (!pendingIntent?.campaign && excludedFiles.length) return;
+        const accepted = await runner.executeCampaign(campaign.campaign_id, intent, excludedFiles);
+        if (!mounted.current) return;
+        retainIntent({ intent, campaign, jobId: accepted.job_id });
+        setJob(accepted);
+        if (accepted.status !== "queued" && accepted.status !== "active") {
+          retainIntent(null);
+          openJobResults(accepted);
+        }
       } else if (investigation) {
         const currentCases = await runner.listInvestigationCases();
+        if (!mounted.current) {
+          reportRun(null);
+          return;
+        }
         const current = currentCases.find(item => item.case_id === caseId);
         const selected = cases.find(item => item.case_id === caseId);
         if (!current || current.case_version !== selected?.case_version) {
@@ -174,7 +256,7 @@ export function ExperimentDashboard({
           if (!current) setCaseId("");
           throw new Error("Research case version changed or is unavailable. Review the refreshed case selection before running again.");
         }
-        const run = await runner.runInvestigation({
+        const request = {
           caseId,
           mode: condition,
           attackFamily: attacked ? attackFamily : undefined,
@@ -182,26 +264,57 @@ export function ExperimentDashboard({
           provider: execution.provider,
           model: execution.model,
           credentialId: execution.credentialId,
-        });
-        onResults(`/results/runs/${run.run_id}`);
+        };
+        const signature = JSON.stringify(request);
+        if (pendingIntent && pendingIntent.signature !== signature && !pendingIntent.jobId) throw new Error('A submission has an uncertain response. Restore its selections and retry the same intent before starting different work.');
+        const intent = pendingIntent?.signature === signature ? pendingIntent.intent : crypto.randomUUID();
+        const sample = sampleRun || (pendingIntent?.signature === signature && pendingIntent.sample);
+        retainIntent({intent, signature, sample});
+        const accepted = await runner.runInvestigation({...request, intent});
+        reportRun(accepted);
+        if (!mounted.current) return;
+        retainIntent({intent, signature, sample, jobId: accepted.job_id});
+        setJob(accepted);
+        if (accepted.run_id) {
+          retainIntent(null);
+          if (!sample) openJobResults(accepted);
+          else if (accepted.status === "completed") setSampleResultId(accepted.run_id);
+        }
       } else {
-        const run = await runner.runExperiment({
+        const request = {
           sessionId: session.id,
           credentialId: session.credentialId,
           scenarioId: selectedScenario?.scenario_id,
           mode,
           provider: session?.model,
           model: providerModels[session?.model],
-        });
-        onResults(`/results/runs/${run.run_id}`);
+        };
+        const signature = JSON.stringify(request);
+        if (pendingIntent && pendingIntent.signature !== signature && !pendingIntent.jobId) throw new Error("Restore the previous selections to retry the pending submission.");
+        const intent = pendingIntent?.signature === signature ? pendingIntent.intent : crypto.randomUUID();
+        retainIntent({ intent, signature });
+        const accepted = await runner.runExperiment({ ...request, intent });
+        if (!mounted.current) return;
+        retainIntent({ intent, signature, jobId: accepted.job_id });
+        setJob(accepted);
+        if (accepted.run_id) {
+          retainIntent(null);
+          openJobResults(accepted);
+        }
       }
     } catch (error) {
+      reportRun?.(null, error.message);
+      if (!mounted.current) return;
       setLoadError(error.message);
+      if ([400, 404, 409, 422].includes(error.status) &&
+          !(error.status === 409 && executionMode === executionModes.campaign)) retainIntent(null);
     } finally {
-      setRunning(false);
+      inFlight.current = false;
+      if (mounted.current) setSubmitting(false);
     }
   };
   const batch = executionMode === executionModes.campaign;
+  const LaunchButton = investigation ? PendingButton : "button";
   return (
     <main className="app-shell dashboard-page">
       <Sidebar
@@ -225,11 +338,20 @@ export function ExperimentDashboard({
                 ? investigationProvider === "scripted"
                   ? "Scripted offline model"
                   : modelOptions[investigationProvider]
-                : modelOptions[session?.model]}{" "}
-            · Configure an experiment, then review saved evidence on Results.
+                : modelOptions[session?.model]}
           </p>
         </div>
       </section>
+      {!groupMode && job && <div className="card investigation-job-status" role="status" aria-label={investigation ? "Investigation job" : "Metadata job"}>
+          <div>
+            <p>{investigation ? "Investigation" : job.campaign_id ? "Campaign" : "Metadata experiment"} {job.status === "active" ? "running" : job.status}. {sampleResultId ? "" : `Job ${job.job_id}`}</p>
+            {['queued', 'active'].includes(job.status) && <p>You can leave this page and return to follow this job.</p>}
+            {job.status === 'interrupted' && <p>The provider outcome is uncertain. This job will not replay automatically. Starting another investigation may incur a new provider charge.</p>}
+            {job.status === 'failed' && <p>The attempt failed. {job.error_category}</p>}
+          </div>
+          {job.run_id && <button ref={savedRunButton} className={sampleResultId ? "run-button" : "small-button"} type="button" onClick={() => openJobResults(job)}>{investigation ? "View saved run" : "Open metadata result"}</button>}
+          {job.campaign_id && <button type="button" onClick={() => openJobResults(job)}>Open campaign results</button>}
+        </div>}
       <div
         className="execution-mode"
         role="group"
@@ -256,10 +378,29 @@ export function ExperimentDashboard({
           Single run
         </button>
       </div>
+      {(groupMode || investigation) && (
+        <p className="run-destination">
+          Single run investigates one case under one condition. Matched group compares conditions using the same case and model.
+        </p>
+      )}
+      {!groupMode && investigation && (
+        <section className="card sample-investigation" aria-label="Sample investigation">
+          <div>
+            <h2>Start with a sample investigation</h2>
+            <p>Investigate one synthetic case with the offline model. No API key required.</p>
+            {sampleRun && !sampleResultId && <p role="status">Sample ready to review below.</p>}
+            {!casesLoading && !sampleAvailable && <p>The sample case is unavailable. You can choose another available case below.</p>}
+          </div>
+          <button className={sampleRun ? "small-button" : "run-button"} type="button" disabled={running || !sampleAvailable} onClick={prepareSample}>
+            Try a sample investigation
+          </button>
+        </section>
+      )}
       {running && (
         <p role="status">
-          {batch ? "Campaign" : "Experiment"} running. Results will open when
-          this request finishes.
+          {investigation && !groupMode
+            ? 'Investigation job in progress. You can return to this page to follow its saved status.'
+            : groupMode ? 'Matched group job in progress. You can leave and return to follow its saved progress.' : `${batch ? 'Campaign' : 'Experiment'} running. Results will open when this request finishes.`}
         </p>
       )}
       {loadError && (
@@ -269,12 +410,13 @@ export function ExperimentDashboard({
       )}
       {groupMode ? (
         <GroupLauncher
-          onRunningChange={setRunning}
+          onRunningChange={setGroupRunning}
           runner={runner}
           selection={executionSelection}
           onSelectionChange={onExecutionChange}
           executionOptions={executionOptions}
           onResults={onResults}
+          onRunStart={onRunStart}
         />
       ) : (
         <>
@@ -321,14 +463,7 @@ export function ExperimentDashboard({
                               if (!next?.attacks?.length) setCondition("clean");
                             }}
                           >
-                            {cases.map((item) => (
-                              <option key={item.case_id} value={item.case_id}>
-                                {item.name} · v{item.case_version}
-                                {item.dataset_category
-                                  ? ` · ${item.dataset_category.replaceAll("-", " ")}`
-                                  : ""}
-                              </option>
-                            ))}
+                            <CaseOptions cases={cases} />
                           </select>
                         </label>
                         <label className="field">
@@ -649,8 +784,23 @@ export function ExperimentDashboard({
                       ? "Synthetic evidence only. Recommendations do not change incident state."
                       : "This workflow retrieves no evidence and executes no external MCP tool."}
                 </p>
-                <button
+                {batch && Boolean(pendingIntent?.campaign?.excluded_files?.length) && (
+                  <p role="status">Invalid scenario files excluded: {pendingIntent.campaign.excluded_files.join(", ")}.</p>
+                )}
+                {investigation && !running && (
+                  <p className="run-destination">
+                    {casesLoading ? "Loading cases…" : !caseId
+                      ? "Select an available synthetic case to run an investigation."
+                      : !execution.valid
+                        ? "Select Scripted offline or choose a configuration with a valid API key."
+                        : attacked && !attack
+                          ? "Select an available option for this condition."
+                          : "When the run finishes, you can open its saved result."}
+                  </p>
+                )}
+                <LaunchButton
                   className="run-button"
+                  {...(investigation && { pending: submitting })}
                   onClick={startRun}
                   disabled={
                     running ||
@@ -663,18 +813,21 @@ export function ExperimentDashboard({
                         : !selectedScenario))
                   }
                 >
-                  {running
+                  {running && !(investigation && submitting)
                     ? "Running…"
                     : batch
-                      ? "Run all poisoned scenarios"
+                      ? pendingIntent?.campaign?.excluded_files?.length
+                        ? "Run usable poisoned scenarios"
+                        : "Run all poisoned scenarios"
                       : investigation
-                        ? "Run MCP investigation"
+                        ? sampleRun ? "Run investigation" : "Run MCP investigation"
                         : "Run new experiment"}
                   <Icon name="arrow" size={14} />
-                </button>
-                <p className="run-destination">
-                  The exact saved result opens when this request finishes.
-                </p>
+                </LaunchButton>
+                {investigation && submitting && <p role="status">Submitting investigation…</p>}
+                {!investigation && <p className="run-destination">
+                  Follow the saved job status here, then open its exact result in Results.
+                </p>}
               </section>
             </div>
             <article className="card recent-activity">

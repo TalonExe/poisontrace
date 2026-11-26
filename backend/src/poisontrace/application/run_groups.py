@@ -3,13 +3,20 @@ from copy import deepcopy
 from dataclasses import asdict
 
 from poisontrace.application.ports import RunGroupStore
-from poisontrace.domain import SyntheticCase, investigation_attack
+from poisontrace.domain import investigation_attack
 from poisontrace.domain.run_groups import compare_group
+from poisontrace.application.runs import require_run_analyst
+from poisontrace.application.principals import analyst_owner_id
 
 
 class RunGroupService:
     def __init__(self, store: RunGroupStore, runs, profiles):
         self.store, self.runs, self.profiles = store, runs, profiles
+
+    def authorize(self, identifier):
+        owner = analyst_owner_id()
+        if owner is None or self.store.owner_for(identifier) != owner:
+            raise KeyError('group not found')
 
     def profile(self, provider):
         runner = self.runs.investigations
@@ -17,7 +24,8 @@ class RunGroupService:
                     limits=dict(max_calls=str(runner.max_calls), timeout_seconds=str(runner.timeout_seconds), max_output_bytes=str(runner.max_output_bytes)),
                     scoring_version='investigation-scoring-v1', decision_contract_version='canonical-handling-v2', condition_version='manifest-mcp-v1')
 
-    def create(self, payload):
+    def prepare_plan(self, payload):
+        require_run_analyst()
         allowed = {'case_id','case_version','provider','model','credential_id','attack_family','conditions','repeats'}
         if set(payload) - allowed:
             raise ValueError('unsupported group configuration')
@@ -47,52 +55,41 @@ class RunGroupService:
         plan = dict(version='matched-group-v1', case=asdict(case), attack=attack, provider=provider,
                     model=payload.get('model') if provider!='scripted' else 'scripted-soc-v2',
                     conditions=conditions, repeats=repeats, execution=self.profile(provider))
-        identifier = self.store.create(plan)
-        return self.execute(identifier, {'credential_id':payload['credential_id']} if payload.get('credential_id') else {})
+        return plan
+
+    def create(self, payload):
+        require_run_analyst()
+        raise ValueError('submit groups through durable jobs')
 
     def execute(self, identifier, payload):
-        if set(payload) - {'credential_id'}:
-            raise ValueError('reruns use the saved group configuration; only a credential reference may be supplied')
-        group = self.store.get(identifier)
-        plan = group['plan']
-        if plan['execution'] != self.profile(plan['provider']) or (plan['attack'] and plan['attack'] != asdict(investigation_attack(plan['attack']['family']))):
-            raise ValueError('runtime or payload changed; create a new group for the new inputs')
-        case = SyntheticCase(**plan['case'])
-        prepared = {}
-        for condition in plan['conditions']:
-            request = dict(case_id=case.case_id, mode=condition, provider=plan['provider'], model=plan['model'], **payload)
-            if condition != 'clean':
-                request['attack_family'] = plan['attack']['family']
-            prepared[condition] = self.runs.prepare_investigation(request, case=case)
-        slots = [(repeat,condition) for repeat in range(1,plan['repeats']+1) for condition in plan['conditions']]
-        attempts = self.store.claim(identifier, slots)
+        self.authorize(identifier)
         # Failures returned by the runner are saved results and do not stop the schedule.
         # Process/storage loss leaves explicit unlinked slots; durable recovery is outside this workflow.
-        for attempt in attempts:
-            selected, configuration, factory = prepared[attempt['condition']]
-            configuration = {**configuration, 'group_id':identifier, 'group_attempt':str(attempt['attempt']), 'group_repeat':str(attempt['repeat'])}
-            result = self.runs.investigations.run_snapshot(deepcopy(selected), configuration, model_factory=factory)
-            self.store.finish_attempt(identifier, attempt['attempt'], result.run_id)
-        self.store.finish(identifier)
-        return self.get(identifier)
+        raise ValueError('submit group reruns through durable jobs')
 
     def get(self, identifier):
+        self.authorize(identifier)
         group = self.store.get(identifier)
         results = {}
         for attempt in group['attempts']:
             if attempt['run_id'] is not None:
                 try:
-                    results[attempt['run_id']] = self.runs.store.result_for(attempt['run_id'])
+                    results[attempt['run_id']] = self.runs.result_for(attempt['run_id'])
                 except KeyError:
                     pass
+        # A corrupt/legacy association must not disclose a foreign child identifier.
+        group['attempts'] = [{**a, 'run_id': a['run_id'] if a['run_id'] in results else None} for a in group['attempts']]
         comparison=compare_group(group, results)
         attempts=[]
         for attempt in group['attempts']:
             result=results.get(attempt['run_id'])
-            attempts.append({**attempt, 'status':result.status if result else None,
-                             'error_category':result.error_category if result else None,
+            attempts.append({**attempt, 'status':result.status if result else attempt.get('execution_status') or 'missing',
+                             'error_category':result.error_category if result else ('provider_outcome_uncertain' if attempt.get('execution_status') == 'interrupted' else None),
                              'execution_time_ms':result.execution_time_ms if result else None})
-        return {**group, 'attempts':attempts, 'comparison':comparison}
+        progress = {key: sum(a['status'] == key for a in attempts) for key in ('completed', 'failed', 'interrupted', 'missing', 'queued', 'active')}
+        return {**group, 'attempts':attempts, 'comparison':comparison, 'progress':progress}
 
     def list(self):
-        return [{key:group[key] for key in ('group_id','status','created_at','plan')} for group in self.store.list()]
+        owner = analyst_owner_id()
+        groups = (self.store.get(i) for i in self.store.ids_for(owner)) if owner is not None else []
+        return [{key:group[key] for key in ('group_id','status','created_at','plan')} for group in groups]

@@ -29,6 +29,11 @@ class ScenarioRunner:
         self.gateway = gateway
         self.approval_actor = approval_actor
 
+    @staticmethod
+    def validate_condition(definitions):
+        if not definitions or any(not isinstance(tool.name, str) or not tool.name.strip() or not isinstance(tool.description, str) or not tool.description.strip() for tool in definitions):
+            raise ValueError("condition requires nonempty tool names and descriptions")
+
     def run(
         self,
         scenario: Scenario,
@@ -43,8 +48,7 @@ class ScenarioRunner:
         if trusted is None:
             trusted = tuple(self.gateway.approved_manifest.values())
         definitions = trusted if mode == ExperimentMode.CLEAN else scenario.tools
-        if not definitions or any(not isinstance(tool.name, str) or not tool.name.strip() or not isinstance(tool.description, str) or not tool.description.strip() for tool in definitions):
-            raise ValueError("condition requires nonempty tool names and descriptions")
+        self.validate_condition(definitions)
         self.gateway.enforce_manifest = mode != ExperimentMode.POISONED
         scenario = replace(scenario, tools=definitions)
         configuration = {
@@ -157,7 +161,12 @@ class ScenarioRunner:
             )
         except Exception as exc:
             # Store fixed categories only, never provider messages, response bodies or repr(exc).
-            category = "response_validation_error" if isinstance(exc, (ValueError, TypeError, KeyError)) else "experiment_execution_error"
+            if isinstance(exc, TimeoutError):
+                category = "provider_timeout"
+            elif isinstance(exc, (ValueError, TypeError, KeyError)):
+                category = "response_validation_error"
+            else:
+                category = "experiment_execution_error"
             self.trace_store.record(TraceEvent("experiment_failed", {"error_category": category}, run_key))
             result = ExperimentResult(
                 scenario_id=scenario.scenario_id, mode=mode, recommendation="",

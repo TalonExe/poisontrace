@@ -1,6 +1,9 @@
+import { useContentReadOnly } from "../../components/ContentPolicy";
 import React, { useEffect, useState } from "react";
+import { PendingButton } from "../../components/common/PendingButton";
 
 export function CaseGroundTruthEditor({runner, caseId, disabled, onSaved, onPendingChange}) {
+  const readOnly = useContentReadOnly();
   const [open, setOpen] = useState(false);
   const [data, setData] = useState(null);
   const [targets, setTargets] = useState("{}");
@@ -19,7 +22,7 @@ export function CaseGroundTruthEditor({runner, caseId, disabled, onSaved, onPend
   }, [open, caseId, runner]);
   function expected(field, value) { setData({...data, expected_decision:{...data.expected_decision,[field]:value}}); }
   async function save(event) {
-    event.preventDefault(); setError(""); setMessage("");
+    event.preventDefault(); if (readOnly || pending || disabled) return; setError(""); setMessage("");
     let predicates;
     try {predicates = JSON.parse(targets);} catch {setError("Attack predicates must be valid JSON."); return;}
     setPending(true); onPendingChange?.(true);
@@ -29,13 +32,14 @@ export function CaseGroundTruthEditor({runner, caseId, disabled, onSaved, onPend
     } catch(e) {setError(e.message);} finally {setPending(false); onPendingChange?.(false);}
   }
   return <section aria-label="Case ground truth">
-    <button type="button" className="text-button" disabled={pending || disabled || !caseId} aria-expanded={open} onClick={()=>setOpen(!open)}>{open ? "Close case ground truth" : "Edit case ground truth"}</button>
+    <button type="button" className="text-button" disabled={pending || disabled || !caseId} aria-expanded={open} onClick={()=>setOpen(!open)}>{open ? "Close case ground truth" : readOnly ? "View case ground truth" : "Edit case ground truth"}</button>
     {open && <>
-      <p>Ground truth stays outside model and MCP inputs. Saving creates a new case version and preserves earlier results. Evidence remains unchanged.</p>
-      {pending && <p role="status">Loading or saving case ground truth…</p>}
+      <p>{readOnly ? "Curated ground truth stays outside model and MCP inputs." : "Ground truth stays outside model and MCP inputs. Saving creates a new case version and preserves earlier results. Evidence remains unchanged."}</p>
+      {pending && <p role="status">{readOnly ? "Loading case ground truth…" : "Loading or saving case ground truth…"}</p>}
       {error && <p className="form-error" role="alert">{error} Close and reopen to reload the latest version.</p>}
       {message && <p role="status">{message}</p>}
-      {data && <form onSubmit={save}>
+      {data && readOnly && <div><p>{data.case_id} · version {data.case_version}</p><dl><dt>Dataset category</dt><dd>{data.dataset_category || "Unavailable"}</dd><dt>Expected verdict</dt><dd>{data.expected_decision?.verdict}</dd><dt>Expected priority</dt><dd>{data.expected_decision?.priority}</dd><dt>Expected handling</dt><dd>{data.expected_decision?.handling}</dd><dt>Attack predicates</dt><dd><pre>{targets}</pre></dd></dl></div>}
+      {data && !readOnly && <form onSubmit={save}>
         <p>Editing {data.case_id} · version {data.case_version}</p>
         <div className="fields">
           <label className="field"><span>Dataset category</span><select disabled={pending || disabled} value={data.dataset_category || ""} onChange={e=>setData({...data,dataset_category:e.target.value || null})}>
@@ -53,7 +57,7 @@ export function CaseGroundTruthEditor({runner, caseId, disabled, onSaved, onPend
         <label className="field"><span>Attack predicates JSON</span><textarea disabled={pending || disabled} value={targets} onChange={e=>setTargets(e.target.value)} rows={6} spellCheck={false}/></label>
         <p>Allocated attack families: {data.supported_attack_families?.join(", ") || "none, clean control"}. Handling must be close or escalate. Detailed recommendations belong in the decision explanation.</p>
         <p>Example: <code>{'{"description-poisoning":{"handling":"close"}}'}</code></p>
-        <button type="submit" className="run-button" disabled={pending || disabled}>Save ground truth as new version</button>
+        <PendingButton type="submit" className="run-button" pending={pending} disabled={disabled}>Save ground truth as new version</PendingButton>
       </form>}
     </>}
   </section>;

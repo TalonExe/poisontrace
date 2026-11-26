@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./verification-test.js";
 
 async function fixture(page) {
   const requests = [];
@@ -6,7 +6,7 @@ async function fixture(page) {
     (url) => url.pathname.startsWith("/api/"),
     async (route) => {
       const path = new URL(route.request().url()).pathname;
-      if (path === "/api/runs" && route.request().method() === "POST") {
+      if (["/api/runs", "/api/investigation-jobs"].includes(path) && route.request().method() === "POST") {
         requests.push(route.request().postDataJSON());
         return route.fulfill({
           status: 400,
@@ -224,7 +224,7 @@ test("missing credentials block a defended launch without losing condition or fa
   const requests = await fixture(page);
   await page.addInitScript(() =>
     localStorage.setItem(
-      "poisontrace.synthetic.sessions",
+      "poisontrace.account.analyst:researcher.poisontrace.synthetic.sessions",
       JSON.stringify([
         {
           id: "missing-ref",

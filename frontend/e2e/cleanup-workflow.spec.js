@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./verification-test.js";
 
 test("matched entry and shared Results navigation are primary", async ({
   page,
@@ -31,7 +31,7 @@ test("matched entry and shared Results navigation are primary", async ({
   await expect(page).toHaveURL(/\/results\/groups$/);
 });
 
-test("Advanced keeps metadata execution and YAML scenarios keyboard accessible", async ({
+test("Advanced omits metadata execution shortcuts and keeps YAML scenarios accessible", async ({
   page,
 }) => {
   await page.route(
@@ -51,27 +51,8 @@ test("Advanced keeps metadata execution and YAML scenarios keyboard accessible",
   await expect(advanced).toHaveText("Advanced");
   await advanced.focus();
   await page.keyboard.press("Enter");
-  await page
-    .getByRole("button", { name: "Metadata experiments", exact: true })
-    .click();
-  await expect(
-    page.getByRole("combobox", { name: "Scenario", exact: true }),
-  ).toBeVisible();
-  await page.reload();
-  await expect(
-    page.getByRole("combobox", { name: "Scenario", exact: true }),
-  ).toBeVisible();
-  await page.locator(".workspace-navigation summary").click();
-  await page
-    .getByRole("button", { name: "Metadata campaigns", exact: true })
-    .click();
-  await expect(
-    page.getByRole("button", {
-      name: "Run all poisoned scenarios",
-      exact: true,
-    }),
-  ).toBeVisible();
-  await page.locator(".workspace-navigation summary").click();
+  await expect(page.getByRole("button", { name: "Metadata experiments", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Metadata campaigns", exact: true })).toHaveCount(0);
   await page
     .getByRole("button", { name: "Metadata scenarios (YAML)", exact: true })
     .click();
@@ -90,7 +71,7 @@ for (const [provider, model] of [
     await page.addInitScript(
       ({ provider }) =>
         localStorage.setItem(
-          "poisontrace.synthetic.sessions",
+          "poisontrace.account.analyst:researcher.poisontrace.synthetic.sessions",
           JSON.stringify([
             {
               id: "selected-config",
@@ -258,13 +239,13 @@ test("secondary single MCP selection survives refresh and back", async ({
 });
 
 test('metadata launch pages retain configuration prerequisites', async ({page}) => {
-  await page.addInitScript(() => localStorage.setItem('poisontrace.synthetic.sessions', '[]'));
+  await page.addInitScript(() => localStorage.setItem('poisontrace.account.analyst:researcher.poisontrace.synthetic.sessions', '[]'));
   await page.route(url => url.pathname.startsWith('/api/'), route => route.fulfill({json:
     new URL(route.request().url()).pathname === '/api/auth/session'
       ? {user:{username:'researcher',role:'analyst'}} : []}));
   for (const path of ['/dashboard/metadata','/dashboard/campaign']) {
     await page.goto(path);
-    await expect(page.getByRole('heading',{name:'Configurations',exact:true})).toBeVisible();
+    await expect(page.getByRole('heading',{name:'Settings',exact:true})).toBeVisible();
     await expect(page.getByRole('button',{name:'Run matched group',exact:true})).toHaveCount(0);
   }
 });

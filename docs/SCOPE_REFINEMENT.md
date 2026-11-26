@@ -1,12 +1,12 @@
 # Final research scope
 
-Status: scope and ticket breakdown approved, 2026-11-11. GitHub issues #20-#31 are published and read-back verified. No implementation or paid experiments are authorized by this document.
+Current research scope under ADR 0004. Implementation and verification state is in [STATUS.md](STATUS.md). Research tickets #29–#31 are cancelled; the study below describes the original research design, not pending implementation or authorization to run it.
 
 ## Purpose and research boundary
 
 Finish a manageable PoisonTrace prototype that measures how description poisoning and cross-server tool shadowing affect evidence-based SOC decisions, and how one manifest-comparison defense changes those outcomes. MCP discovery and invocation are real; tools use synthetic data and are read-only.
 
-The original PDF is a revisable research specification. The [requirements audit](RESEARCH_REQUIREMENTS_AUDIT.md) remains evidence against that original document, not an immutable release backlog. Revised claims must match the smaller scope and collected evidence. The original PDF and dated audit have not been rewritten.
+Research claims must match this narrower scope and collected evidence. Historical requirements audits were removed during documentation cleanup; this document does not rewrite the original research PDF or establish fulfillment of its broader promises.
 
 ## Included software
 
@@ -39,7 +39,7 @@ Results uses separate views or tabs for overview, investigation detail and compa
 
 Handle loading, empty history, failed attempts, unavailable/legacy measurements and missing compatible comparisons explicitly. Keep keyboard access and readable mobile layouts. Preserve current design tokens. Exact visual arrangement remains an implementation design task within these agreed page responsibilities.
 
-## Minimum research demonstration
+## Research demonstration design
 
 - Repeat clean, attacked and defended trials on one selected live model, covering the 15 cases and both attack families. Prespecify exact attack allocation and repetition count. Every possible case/model/attack combination is not required.
 - Verify both provider implementations, while retaining a one-model minimum controlled study. Provider support does not establish cross-model generality.
@@ -49,7 +49,7 @@ Handle loading, empty history, failed attempts, unavailable/legacy measurements 
 
 ## Completion checks
 
-These define the finite software finish line, not existing functionality.
+These define the bounded research software contract. Consult STATUS for implementation and verification; this table is not a current ticket backlog.
 
 | ID | Observable acceptance evidence |
 | --- | --- |
@@ -58,13 +58,13 @@ These define the finite software finish line, not existing functionality.
 | F03 | A controlled evidence change can affect the final decision through tool-result feedback. Trace order proves evidence preceded the final output. Scripted substitutes establish mechanics, not live-model effectiveness. |
 | F04 | Both attack families have reproducible cases and explicit goals. Marker presence remains independent of goal achievement. |
 | F05 | Defended discovery withholds unapproved/changed definitions before exposure; invocation rejects unapproved calls. Clean/attacked conditions remain distinct, with observed policy decisions saved. |
-| F06 | Gemini and OpenAI handle the bounded evidence workflow correctly. Offline captured-request/response tests cover provider differences and model selection, including audit EVID-4's discrepancy. |
+| F06 | Gemini and OpenAI handle the bounded evidence workflow correctly. Offline captured-request/response tests cover provider differences and model selection. |
 | F07 | Structured outcomes and evidence references persist and reopen. Measurements distinguish incorrect decisions, attacker outcomes, markers, policy rejection and errors, with denominators and historical compatibility. |
 | F08 | Dashboard supports uncluttered execution; Results supports history/detail/trace and compatible same-case comparisons. Browser checks cover the split, mobile use and material empty/error/unavailable states. |
 | F09 | Existing scenario identity/repair, roles, safe credential handling, failure retention and run attribution remain intact. Appropriate backend/frontend/build/integration checks pass. |
 | F10 | Scope/objective documentation, dataset description, run instructions and limitations match delivered behavior. Original PDF commitments moved to future work are identified explicitly. |
 
-Software completion means F01-F10. Research demonstration additionally needs the limited live evaluation and results summary. The software may be finished before the study runs; positive effectiveness and broad generality are not acceptance conditions.
+F01–F10 describe the original bounded software contract. A live study would additionally require a new request, selected model/version, repetitions and spending cap. The cancelled #29–#31 sequence is not a release prerequisite. Positive effectiveness and broad generality are not acceptance conditions.
 
 ## Future work and excluded release blockers
 
@@ -97,4 +97,4 @@ The revised wording no longer promises multiple-defense comparison, mandatory mu
 
 Implementation choices may vary within the acceptance checks. New capabilities require a separate scope decision and otherwise go to future work. Fixes necessary to pass agreed checks belong to the core. Decide experiment resources before spending, rather than silently increasing trials.
 
-The user approved the breakdown and GitHub issues #20-#31 are published. See [ADR 0004](adr/0004-bounded-research-core.md) for the trade-off and [the ticket plan](BOUNDED_CORE_TICKET_PLAN.md) for verified links and blockers. Implementation requires a subsequent request; this discussion has changed planning documents, glossary terms and tracker issues, not application code.
+[ADR 0004](adr/0004-bounded-research-core.md) records the scope trade-off. [STATUS.md](STATUS.md) is the current work frontier. This scope authorizes no new implementation, paid experiment or deployment.

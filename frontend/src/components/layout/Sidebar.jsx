@@ -1,5 +1,8 @@
 import React from "react";
+import { Link } from "@tanstack/react-router";
+import { useContentReadOnly } from "../ContentPolicy";
 import { AuthenticatedHeader } from "./AuthenticatedHeader";
+import { Icon } from "../common/Ui";
 
 export function Sidebar({
   active,
@@ -12,6 +15,7 @@ export function Sidebar({
   auth,
   onSignedOut,
 }) {
+  const readOnly = useContentReadOnly();
   if (!visible) return null;
   return (
     <div className="workspace-chrome">
@@ -20,14 +24,21 @@ export function Sidebar({
         auth={auth}
         onSignedOut={onSignedOut}
         subtitle="Synthetic research workspace"
+        accountAction={onSessions && (
+          <button
+            type="button"
+            className="profile-settings-button"
+            aria-label="Settings"
+            aria-current={active === "sessions" ? "page" : undefined}
+            title="Settings"
+            onClick={onSessions}
+          >
+            <Icon name="settings" size={19} />
+          </button>
+        )}
       />
       <nav className="workspace-navigation" aria-label="Workspace navigation">
-        <button
-          aria-current={active === "sessions" ? "page" : undefined}
-          onClick={onSessions}
-        >
-          Configurations
-        </button>
+        <Link to="/activity" activeOptions={{ exact: true }}>Dashboard</Link>
         <button
           aria-current={active === "dashboard" ? "page" : undefined}
           onClick={onDashboard}
@@ -43,13 +54,7 @@ export function Sidebar({
         <details className="advanced-navigation">
           <summary>Advanced</summary>
           <button aria-current={active === "research-cases" ? "page" : undefined} onClick={() => onDashboard("/research-cases")}>
-            MCP research case authoring
-          </button>
-          <button onClick={() => onDashboard("/dashboard/metadata")}>
-            Metadata experiments
-          </button>
-          <button onClick={() => onDashboard("/dashboard/campaign")}>
-            Metadata campaigns
+            {readOnly ? "MCP research cases" : "MCP research case authoring"}
           </button>
           <button
             aria-current={active === "scenarios" ? "page" : undefined}

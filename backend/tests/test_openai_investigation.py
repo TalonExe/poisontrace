@@ -1,4 +1,5 @@
 """Offline OpenAI Responses requests at the investigation model boundary."""
+from job_helpers import complete_investigation
 import asyncio
 import pytest
 import json
@@ -78,7 +79,7 @@ def test_openai_http_investigation_continues_from_real_mcp_and_reopens(tmp_path,
     config = WebConfig(scenario_dir=tmp_path/'scenarios',database=tmp_path/'runs.db')
     backend = build_backend(config,Secrets(),investigation_model_factory=factory)
     http = analyst_client(create_app(backend))
-    result = http.post('/api/runs',json=dict(workflow='mcp-investigation-v1',case_id='soc-auth-001',mode='defended' if defended else 'poisoned' if family else 'clean',attack_family=family,provider='openai',model='gpt-5-mini-test-snapshot',credential_id='test-reference'))
+    result = complete_investigation(http, backend, dict(workflow='mcp-investigation-v1',case_id='soc-auth-001',mode='defended' if defended else 'poisoned' if family else 'clean',attack_family=family,provider='openai',model='gpt-5-mini-test-snapshot',credential_id='test-reference'))
     assert result.status_code == 200, result.text
     assert result.json()['status'] == 'completed'
     detail = http.get('/api/runs/'+str(result.json()['run_id'])).json()
@@ -133,7 +134,7 @@ def test_openai_failures_are_saved_with_safe_categories_and_null_scores(tmp_path
     if behavior in {'loop','bad_ref'}: assert reopened.investigation['evidence']
 
 
-def test_single_campaign_and_rerun_send_actual_openai_model_to_sdk(tmp_path):
+def test_single_campaign_and_rerun_send_actual_openai_model_to_sdk(tmp_path, application_analyst):
     from pathlib import Path
     from poisontrace.bootstrap import build_backend
     from poisontrace.config import WebConfig
@@ -148,9 +149,15 @@ def test_single_campaign_and_rerun_send_actual_openai_model_to_sdk(tmp_path):
     scenarios = tmp_path/'scenarios'
     scenarios.mkdir()
     (scenarios/'auth-poisoned.yaml').write_bytes(Path('backend/tests/fixtures/scenarios/authentication-alert-poisoned-002.yaml').read_bytes())
-    backend = build_backend(WebConfig(scenario_dir=scenarios,database=tmp_path/'runs.db'),model_factory=factory)
-    single = backend.runs.create(dict(provider='openai',model='gpt-5-mini',scenario_id='002',mode='clean'))
-    campaign = backend.campaign_service.create(dict(provider='openai',model='gpt-5-mini'))
+    from cryptography.fernet import Fernet
+    from poisontrace.adapters.secrets.storage import EncryptedSqliteSecrets
+    from poisontrace.application.principals import Principal, principal_scope
+    storage = EncryptedSqliteSecrets(tmp_path/'keys.db', Fernet.generate_key())
+    with principal_scope(Principal(1, 'analyst')):
+        reference = storage.save('openai', Fernet.generate_key().decode()).credential_id
+    backend = build_backend(WebConfig(scenario_dir=scenarios,database=tmp_path/'runs.db'),storage,model_factory=factory)
+    single = backend.runs.create(dict(provider='openai',model='gpt-5-mini',scenario_id='002',mode='clean',credential_id=reference))
+    campaign = backend.campaign_service.create(dict(provider='openai',model='gpt-5-mini',credential_id=reference))
     executed = backend.campaign_service.execute(campaign['campaign_id'])
     rerun = backend.campaign_service.rerun(campaign['campaign_id'],0)
     assert [r['model'] for r in requests] == ['gpt-5-mini'] * 3
@@ -189,5 +196,9 @@ def test_openai_invalid_configuration_never_resolves_key_or_starts_attempt(tmp_p
     client = analyst_client(create_app(backend))
     payload = dict(workflow='mcp-investigation-v1',case_id='soc-auth-001',mode='clean',provider='openai',model='gpt-5-mini',credential_id='wrong-provider')
     for changes in ({},{'model':''},{'credential_id':''},{'case_id':'missing'},{'mode':'poisoned'}):
-        assert client.post('/api/runs',json={**payload,**changes}).status_code in {400,404}
+        assert complete_investigation(client, backend, {**payload,**changes}).status_code in {400,404}
     assert backend.store.run_ids() == []
+
+
+# Direct application reopening uses an explicit trusted analyst.
+pytestmark = pytest.mark.usefixtures("application_analyst")

@@ -1,6 +1,9 @@
 import importlib.util
+import time
 
 import pytest
+
+from job_helpers import complete_investigation
 
 
 fastapi_available = importlib.util.find_spec("fastapi") is not None
@@ -22,15 +25,19 @@ def test_http_endpoints_are_exposed(tmp_path, analyst_client):
     (scenario_dir / "authentication-alert-001.yaml").write_text(
         source.read_text(encoding="utf-8"), encoding="utf-8"
     )
-    client = analyst_client(create_app(build_backend(WebConfig(scenario_dir=scenario_dir, database=tmp_path / "runs.db"))))
+    backend = build_backend(WebConfig(scenario_dir=scenario_dir, database=tmp_path / "runs.db"))
+    client = analyst_client(create_app(backend))
 
     assert client.get("/api/runs").status_code == 200
     response = client.post(
         "/api/runs",
         json={"session_id": "session-1", "scenario_id": "001", "mode": "clean", "provider": "fake"},
     )
-    assert response.status_code == 200
-    assert response.json()["id"] == "EXP-001"
+    assert response.status_code == 400
+    assert client.get("/api/runs").json() == []
+    result = complete_investigation(client, backend, dict(workflow="metadata-v1", scenario_id="001", mode="clean"))
+    assert result.status_code == 200
+    assert result.json()["id"] == "EXP-001"
 
 
 def test_run_http_preserves_list_detail_and_rejection_contracts(tmp_path, analyst_client):
@@ -44,12 +51,13 @@ def test_run_http_preserves_list_detail_and_rejection_contracts(tmp_path, analys
     source = Path("backend/tests/fixtures/scenarios/authentication-alert-001.yaml")
     (scenario_dir / source.name).write_bytes(source.read_bytes())
     (scenario_dir / "broken.yaml").write_text("scenario_id: '999'\nname: Broken\n", encoding="utf-8")
-    client = analyst_client(create_app(build_backend(WebConfig(scenario_dir=scenario_dir, database=tmp_path / "runs.db"))))
+    backend = build_backend(WebConfig(scenario_dir=scenario_dir, database=tmp_path / "runs.db"))
+    client = analyst_client(create_app(backend))
 
-    created = client.post("/api/runs", json={"scenario_id": "001", "mode": "clean", "session_id": "study", "provider": "fake"})
+    created = complete_investigation(client, backend, dict(workflow="metadata-v1", scenario_id="001", mode="clean", session_id="study", provider="fake"))
     assert created.status_code == 200
-    summary = created.json()
-    assert client.get("/api/runs").json() == [summary]
+    summary, = client.get("/api/runs").json()
+    assert created.json()["run_id"] == summary["run_id"]
     response = client.get(f"/api/runs/{summary['run_id']}")
     assert response.status_code == 200
     detail = response.json()
@@ -60,11 +68,11 @@ def test_run_http_preserves_list_detail_and_rejection_contracts(tmp_path, analys
     assert detail["trace"][0]["kind"] == "tool_discovered"
     assert detail["trace"][-1]["kind"] == "recommendation_created"
 
-    missing = client.post("/api/runs", json={"scenario_id": "missing", "mode": "clean", "provider": "fake"})
+    missing = complete_investigation(client, backend, dict(workflow="metadata-v1", scenario_id="missing", mode="clean", provider="fake"))
     assert missing.status_code == 404
     assert missing.json() == {"detail": "scenario not found"}
-    assert client.post("/api/runs", json={"scenario_id": "broken.yaml", "mode": "clean", "provider": "fake"}).status_code == 400
-    assert client.post("/api/runs", json={"scenario_id": "001", "mode": "clean", "provider": "unknown"}).status_code == 400
+    assert complete_investigation(client, backend, dict(workflow="metadata-v1", scenario_id="broken.yaml", mode="clean", provider="fake")).status_code == 400
+    assert complete_investigation(client, backend, dict(workflow="metadata-v1", scenario_id="001", mode="clean", provider="unknown")).status_code == 400
     assert client.get("/api/runs/999").status_code == 404
 
 
@@ -78,12 +86,24 @@ def test_backend_login_seeds_role_aware_demo_accounts_without_returning_passcode
     monkeypatch.setenv("POISONTRACE_ANALYST_PASSCODE", "analyst-secret")
     monkeypatch.setenv("POISONTRACE_SUPERADMIN_USERNAME", "Admin.Demo")
     monkeypatch.setenv("POISONTRACE_SUPERADMIN_PASSCODE", "admin-secret")
-    client = TestClient(create_app(build_backend(WebConfig(scenario_dir=tmp_path / "scenarios", database=tmp_path / "users.db"))))
+    backend = build_backend(WebConfig(scenario_dir=tmp_path / "scenarios", database=tmp_path / "users.db"))
+    client = TestClient(create_app(backend))
 
     analyst = client.post("/api/auth/login", json={"username": " analyst.demo ", "passcode": "analyst-secret"})
     assert analyst.status_code == 200
     assert analyst.json()["user"]["role"] == "analyst"
-    assert analyst.json()["redirect"] == "/sessions"
+    assert analyst.json()["redirect"] == "/activity"
+    end = int(time.time()) + 60
+    activity = f"/api/runs/activity?start={end - 86400}&end={end}"
+    completed = complete_investigation(client, backend, {
+        "case_id": "soc-auth-001", "provider": "scripted", "mode": "clean",
+    })
+    assert completed.status_code == 200
+    attempt, = client.get(activity).json()["attempts"]
+    assert (attempt["run_id"], attempt["provider"], attempt["status"]) == (
+        completed.json()["run_id"], "scripted", "completed",
+    )
+    assert client.get(f"/api/runs/activity?start={end}&end={end + 60}").json()["attempts"] == []
     assert "passcode" not in analyst.json()
 
     admin = client.post("/api/auth/login", json={"username": "admin.demo", "passcode": "admin-secret"})
@@ -91,6 +111,7 @@ def test_backend_login_seeds_role_aware_demo_accounts_without_returning_passcode
     assert admin.json()["user"]["role"] == "superadmin"
     assert admin.json()["redirect"] == "/admin/users"
     assert "passcode" not in admin.json()
+    assert client.get(activity).status_code == 403
 
 
 def test_backend_session_endpoint_returns_current_user_and_logout_clears_it(tmp_path, monkeypatch):

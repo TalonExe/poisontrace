@@ -1,84 +1,63 @@
 # Matched investigation groups
 
-Implemented locally for issue #28, 2026-11-17. These are offline implementation checks, not a live-model study. The existing metadata campaign still uses its historical poisoned-filename selection and retains its history. Research groups select a corpus case explicitly.
+## Configure and reopen
 
-## Configure, run and reopen
+Experiment selects one synthetic case/version, one provider/model, an ordered nonempty schedule of unique clean/poisoned/defended conditions and positive integer repeats. Scripted offline needs no key. Gemini/OpenAI need a current owned matching credential reference. The summary names the selected payload and total attempts. Controls are clean-only; attack allocation is validated before credential use or execution. Clean-only requests omit attack_family.
 
-Open Experiment to use Matched group setup. Choose Scripted offline or one saved configuration in Execution model and credential, then select a synthetic case, conditions and positive integer repeat count. Scripted offline requires no saved configuration. The selector displays the actual model and current matching credential label/mask together. Reload execution options refreshes configurations and credential metadata without clearing setup. Each group has one case/version and one provider/model. The summary names the case/version, actual model, selected fixed payload, schedule, number of attempts and whether a private credential reference is required. Scripted offline uses no key. Gemini and OpenAI use the matching saved configuration reference and current configured model identifiers.
+Hosted submissions and reruns permit one repeat and at most three unique conditions. Larger local schedules remain supported. A profile switch never rewrites a saved plan; hosted execution rechecks limits before dispatch.
 
-The UI offers clean, poisoned and defended in that order; the HTTP interface also accepts another explicit order. Every repeat runs that ordered schedule. The five allocated malicious cases support either retained family. The ten controls automatically select clean-only and disable poisoned/defended. The API validates allocation before credential lookup or a started attempt. A clean-only group carries no attack family or invented attacker predicate.
+Results Groups reopens progress/comparisons after refresh. Setup and explicit reruns stay in Experiment. Selecting a saved group appends its entire saved schedule, preserving earlier attempts and IDs. Local ground-truth authoring creates a new version for future selections; retained reruns use their pinned case/evidence/labels/targets.
 
-Results opens the directly returned group ID. Groups history reopens after refresh or backend restart. Comparison reports verdict, priority, handling and joint correctness, attacker goals, actual discovery restriction and invocation rejection, raw-marker availability, duration and errors. Each attempt links to its saved decision/evidence/trace. Setup and rerun execution stay on Experiment. Choose a saved group in Group source to append a complete new execution of its schedule; earlier attempts and IDs remain intact. The saved provider/model stays pinned. Select a matching configuration for its current credential, or use no key for a scripted rerun.
+## HTTP and admission
 
-To revise ground truth, open Advanced > MCP research case authoring. It is separate from execution and from Metadata scenarios (YAML). Return to Experiment reloads the catalog; a new group selects a current version. Stale group requests are rejected before execution. Retained reruns continue to use the saved case/evidence/labels/targets even after an edit.
+| Interface | Behavior |
+| --- | --- |
+| GET /api/run-groups | Owner-filtered plans and status. |
+| POST /api/run-groups | Idempotency-Key required; validates and atomically accepts job, pinned group and slots; HTTP 202 returns job_id/group_id. |
+| GET /api/run-groups/{group_id} | Owned attempts, progress, compatibility and comparison. |
+| POST /api/run-groups/{group_id}/execute | New intent appends the saved schedule; accepts only optional credential_id; HTTP 202 returns job_id/group_id. |
+| GET /api/investigation-jobs/{job_id} | Owner-authorized durable job status. |
 
-## Saved inputs and compatibility
-
-The immutable plan stores the complete selected SyntheticCase, including version, evidence, ground truth and optional predicates; fixed attack ID/full text; provider/model; ordered conditions and repeats; approved definitions; bounds; exact provider instruction/output-schema and generation-settings snapshots; and scoring, decision and condition versions. Private keys and credential references are absent from the plan. Each run retains only its existing private credential reference in run configuration. Keys stay in the request-local provider factory.
-
-InvestigationRunner.run_snapshot receives a separate copy of the selected case for each attempt. Later label edits do not change a saved group's case/version or earlier outcomes. A rerun uses that old selected snapshot even when the current case library has a newer version. Runtime/payload changes are rejected before new slots are claimed; create a new group for those inputs. Selected model identifiers do not prove that a provider alias refers to an immutable backend model version.
-
-Compatibility checks compare the saved case/evidence/targets, actual provider/model, prompt version and full instruction/schema snapshot, effective explicit generation settings, limits, scoring/decision/condition versions, full attack snapshot and full approved definitions. Actual discovered and exposed definitions are compared with the selected condition's expected definitions. Trusted returned records must match the selected fixture. Group/attempt/repeat attribution must match too. Intentional ordinary versus poisoned metadata, withholding in defended mode and disabled versus enforced policy are the experimental contrast, not incompatibility.
-
-Payload v1/v2, changed evidence or labels, different models/settings/prompts, unexpected tool metadata, unscored history and missing provenance cannot silently enter matched decision rates. Group comparisons never import arbitrary pooled history or rescore historical records. Full provider instructions and schemas are the same as before this ticket; they are now shared between request construction and saved comparison snapshots.
-
-## Counts, missing values and failures
-
-Each condition reports requested repeats per execution, all scheduled slots including reruns, saved attempts, compatible completions, failed saved attempts, incompatible attempts and missing saved results. Every rate has a numerator and eligible denominator, plus an explicit unavailable count among compatible attempts. Zero eligible outcomes produce null, not a zero-success claim. Duration is the mean across compatible saved attempts, including failures, with its count. There is no pairing estimator or uncertainty interval in this software slice.
-
-Field/joint/attacker/marker eligibility retains investigation-scoring-v1 rules. Clean and missing-goal attacker outcomes remain unavailable. Failed decisions and goals remain null. Discovery and invocation rates require actual observed enforced checks and can include a failure after that stage. Disabled enforcement and no observed check are unavailable. Zero returned calls, marker absence and incorrect decisions never imply blocking. Reference validity remains membership in returned evidence, not explanation truth.
-
-All saved failures retain fixed safe categories, elapsed time, available partial evidence and their directly returned run IDs. A failed attempt does not stop the remaining schedule. Failed provider initialization may lack actual prompt/settings provenance and is excluded from matched rates; the separate all-saved system-error rate includes it. Incompatible attempts remain linked and listed with reasons. Requested conditions with no compatible saved attempt are reported missing. Conditions omitted from the schedule are explicitly not requested, including the two attack conditions on clean controls.
-
-## Persistence and operating limits
-
-Additive run_groups and run_group_attempts tables share the configured run database. Atomic claims prevent concurrent executions of one group. Slots are allocated before execution and results associate by returned IDs. Saved runs also carry group_id, group_attempt and group_repeat. Every attempt uses fresh models and real two-process read-only MCP. Ground truth and targets remain outside provider/MCP input.
-
-Execution remains synchronous and request-bound. Process termination or unavailable storage can leave a running group and slots without a saved result. They reopen as missing. There is no worker, resume/recovery platform, automatic provider retry or fabricated failure record for an unstarted slot. Current account-role and credential-reference rules apply; broader per-user history ownership remains the separate existing deployment limitation. Historical campaigns, scenario repair/identity and legacy/null measurements retain their existing paths.
-
-## HTTP
-
-- GET /api/run-groups lists saved plans and status.
-- POST /api/run-groups validates, snapshots and executes a new group.
-- GET /api/run-groups/{group_id} reopens attempts, compatibility and comparison.
-- POST /api/run-groups/{group_id}/execute appends the same schedule, accepting only an optional matching credential_id.
-
-Example offline request:
+A local offline selection example, used with an explicit Idempotency-Key:
 
 ```json
 {"case_id":"soc-auth-001","case_version":"1","provider":"scripted","attack_family":"cross-server-shadowing","conditions":["clean","poisoned","defended"],"repeats":2}
 ```
 
-Case version is required to reject stale setup. Repeats must be an integer greater than zero, excluding booleans. Conditions are a nonempty ordered list with no duplicates. Clean-only omits attack_family. Invalid requests create neither a group nor an attempt. Changed run-time contracts require a new group rather than silently changing a saved plan.
+case_version rejects stale setup. Boolean repeats, duplicates, unsupported selections and mismatched credentials fail before allocation. Body/string limits are 4,096/200 UTF-8 bytes. Exact owner-intent/input repeats reopen the same job, including terminal jobs. Conflicting reuse fails. Single/group submissions share one outstanding queued/active slot; excess work is rejected without a waiting queue or partial group allocation.
 
-Tests use scratch databases, synthetic credentials and SDK substitutes. No live-provider requests or API spending are needed or authorized. #29 owns the protocol/offline rehearsal, #30 final bounded release verification, and #31 the separately authorized live evaluation.
+## Pinned inputs and compatibility
 
+The immutable plan stores the complete selected case/version/evidence/ground truth/targets, fixed attack ID/full text, provider/model, ordered schedule/repeats, approved definitions, limits, exact provider instructions/output schemas/generation settings and scoring/decision/condition versions. Private keys and credential references are absent from the plan; job/run configuration retains the current owned reference without decrypted keys.
 
-## Verification record, 2026-11-17
+Each attempt gets a separate case snapshot copy, fresh model and fresh two-process MCP transport. Expected labels/targets remain outside provider and MCP input. A rerun reuses the old snapshot even after local authoring changes. Runtime/profile/payload compatibility is checked before dispatch; changed runtime/payload requires a new group. Upstream model aliases do not prove immutable provider model versions.
 
-All 300 backend tests passed in 362.74 seconds with the existing Starlette/httpx deprecation warning. All 36 frontend tests, production build, compilation and dependency checks pass. Thirty-four focused mocked browser journeys and nine connected browser/backend/real-local-MCP journeys pass. The two group journeys pass again after adding exact prompt/schema snapshots and intentional-not-scheduled reporting. Checks include both providers through offline SDK clients, six linked trials, persisted restart readback, failures/continuation/nulls, pinned label-edit reruns, incompatibility exclusions and browser refresh/evidence links. Four desktop/mobile captures were reviewed. The independent finish reviewer scored the sole stale product-documentation fix resolved/ship. No live calls or effectiveness measurement occurred.
+Eligibility checks case/evidence/targets, actual provider/model, prompt version/full instructions/schema, effective settings, limits, scoring/decision/condition versions, full payload and approved definitions. Discovered/exposed definitions must match condition-specific expectations; trusted returned records must match pinned evidence. Group/attempt/repeat attribution must agree. Intended metadata exposure and enforcement differences are the experimental contrast, not incompatibility.
 
+Different payload versions, cases, labels, models, prompts/settings, unexpected metadata, unscored history or missing provenance cannot silently enter matched rates. Comparisons neither recruit arbitrary pooled history nor rescore saved records.
 
-## Reading outcome colors
+## Durable persistence and interruption
 
-The user-requested Results presentation now applies green to correct decisions, red to incorrect decisions, and the inverse direction to attacker-goal/error rates: observed target matches/errors are red; their absence is green only with eligible observations. Mixed rates show both favorable and adverse counts. Grey means unscored/unavailable, never a successful zero. Policy restrictions/rejections and raw-marker observations remain purple because they are independent of correctness. Text labels accompany color. Individual investigation scores and pooled MCP rates use the same presentation direction. Saved values, denominators and historical meanings do not change.
+Job, parent and all slots allocate in one immediate SQLite transaction. Every attempt renews its 60-second lease and receives a separate 45-second process watchdog, retaining the investigation loop's four-call/20-second/output bounds. Run, returned ID, trace association and owning slot link commit atomically. The last saved result also finishes the job/group. Ordinary saved failures do not stop later scheduled attempts.
 
-Finished means the condition schedule ended, including retained failures. It does not mean every investigation completed or was correct. An explicit attacker-target match does not by itself prove injection causation; compare clean outcomes and inspect the individual evidence/trace before drawing that conclusion. No additional live calls were used to implement or check this presentation.
+A schedule can finish with failed runs; finished never means every decision was correct. Startup/lease recovery preserves linked results, marks active slots interrupted with uncertain provider outcome and unstarted slots missing. Interrupted work never automatically replays. Queued undispatched jobs may start after restart. An explicit rerun requires a new intent and may incur additional charges.
 
+An older request-bound group may retain a running label without a durable job. An owner-authorized explicit rerun may append when shared admission is free. Older missing slots and unavailable scores remain unchanged. No legacy replay occurs.
 
-## Overall Results indicator, 2026-11-17
+## Counts and measurements
 
-Results now places one overall experiment-performance indicator above the selected explicit matched group's detailed comparison. It displays rounded correct completed decisions / compatible saved attempts × 100, a short label and correct/attempt/failed/unscored counts. Correct requires verdict, priority and handling all to match. The supplied 1 correct, 3 incorrect and 5 failed example displays 11/100. This includes execution reliability; it is neither accuracy among completed decisions nor a validated security benchmark.
+Progress reports completed, failed, interrupted, missing, queued and active slots. Comparison accounting separately reports requested repeats per execution, all scheduled slots including reruns, saved attempts, compatible completions/failures, exclusions and missing saved results. Unlinked slots remain missing in comparison accounting even while queued/active; they never become scored outcomes.
 
-Failed attempts retain null correctness and lower this display-only indicator through the denominator. Completed but unscored attempts also remain in the denominator without adding a correct result, with a visible count. Every compatible retained rerun attempt counts once. Incompatible records and missing saved results are excluded, with existing counts/reasons/links retained below. Empty, unsupported or malformed comparison data is unavailable; completed records with no supported correctness observations also show unavailable. An all-failed compatible group is an observed 0/100. Partial availability limits interpretation.
+Every rate retains numerator, eligible denominator and unavailable counts. Empty eligibility yields null. Correctness and attacker/marker rates follow [the investigation contract](CLEAN_MCP_INVESTIGATION.md). Clean/missing-goal attacker outcomes and failed decisions remain unavailable. Policy rates require actual observed enforced checks; disabled/no-observation states are unavailable. Zero calls, marker absence or wrong decisions never imply blocking.
 
-Only existing joint correctness and compatible counts contribute. Attacker success, restrictions, rejection and marker observations never add points. Existing scores, detailed measurement denominators, historical meanings, evidence links and backend contracts are unchanged. Green only for every compatible attempt confirmed correct, red otherwise, and grey for unavailable are presentation conventions, not research findings. No intermediate score thresholds are introduced. The existing Research route tokens and layout remain in use.
+Duration averages compatible saved attempts, including failures, and reports its count. Failed initialization without prompt/settings provenance is excluded from matched rates but included in separate all-saved reliability. Excluded attempts retain reasons and saved links. Requested conditions without compatible saved attempts are missing; deliberately omitted conditions are not requested. There is no pairing estimator or uncertainty interval.
 
-Verification: 42 frontend tests, production build, compilation and pip check pass. All 39 existing focused mocked browser journeys pass; five added indicator edge-case journeys also pass. The example is checked after refresh and at desktop/mobile widths, with captures reviewed for readable hierarchy and no page overflow. Two connected browser/backend/real-local-MCP group journeys pass, including fresh six-attempt scoring, refresh, individual evidence links and retained clean-control reruns. All 300 backend tests pass in 405.22 seconds with the existing Starlette/httpx deprecation warning. All checks use synthetic fixtures and offline providers. No live group rerun, provider call, API spending, private credential/auth/raw historical-database inspection, tracker mutation, commit, merge or deployment. Prior uncommitted work and debug.log remain preserved. This follow-up is complete before starting #29; the research frontier remains #29 after issue/prerequisite refresh.
+## Results presentation
 
+Decision correctness and target-match outcomes appear first; policy/marker observations and execution accounting remain separate disclosures. Correct outcomes are green. Incorrect decisions, target matches and errors are red. Missing/unscored outcomes are grey. Policy/marker observations are purple and independent of correctness. Text labels accompany colors. Evidence-reference membership is not proof of explanation truth, and a target match alone does not prove injection causation.
 
-## Results presentation, cleanup #36, 2026-11-17
+The display-only overall indicator is rounded correct joint decisions / compatible saved attempts × 100. Failed and completed-unscored attempts remain in its denominator. Incompatible records and missing saved results are excluded. One correct, three incorrect and five failed compatible attempts displays 11/100. Every retained compatible rerun attempt counts once. An all-failed compatible group is 0/100; empty, unsupported/malformed data or completed records with no supported correctness is unavailable. Partial availability limits interpretation. No policy/attacker/marker observation adds points and no intermediate thresholds exist. This includes reliability; it is neither completed-decision accuracy nor a validated security benchmark.
 
-The overall group indicator keeps the same calculation, rounding and unavailable rules. Decision correctness and attacker-target matches form the visible condition table. Policy and marker observations and Execution accounting are separate keyboard-operable disclosures. Execution accounting retains requested/scheduled/saved/completed/failed/missing/excluded counts, both error rates and mean duration with its count. Every metric retains numerator, denominator and unavailable values. Missing results/conditions, intentionally unscheduled conditions and incompatibility reasons remain visible; retained attempts still link directly to saved evidence and traces. Measurement definitions/colors and the complete saved input/compatibility contract remain expandable.
+## Verification and remaining work
 
-Individual MCP results lead with execution status, joint correctness, target-match outcome and actual versus expected fields. Marker and reference-membership observations are separate from decisions. A target match does not establish injection causation, and reference membership does not establish explanation truth. Restrictions/rejections do not imply correctness. Case/scoring/attack details collapse without changing saved values. Overview remains explicitly pooled historical analysis. Historical scoring versions and routes keep their existing meanings.
+Tests cover owned/idempotent/concurrent admission, single/group contention, atomic rollback, pinned label-edited reruns, ordinary failures, interruption without replay, real executor/MCP-child cleanup, hosted limits/profile switches and retained legacy missing slots. Browser checks cover uncertain responses, refresh, six progress counts and actual saved Results links. Read [VERIFICATION.md](../VERIFICATION.md) for commands and [STATUS.md](../STATUS.md) for exact split evidence and remaining platform/operational gaps. Metadata/campaign durable execution remains #47; #29–#31 are cancelled.

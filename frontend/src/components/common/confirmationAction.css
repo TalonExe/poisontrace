@@ -1,0 +1,38 @@
+.confirmation-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  overflow: auto;
+  padding: 24px;
+  background: color-mix(in srgb, var(--ec-text) 50%, transparent);
+}
+
+.confirmation-modal {
+  width: min(100%, 28rem);
+  background: var(--ec-surface);
+}
+
+.confirmation-dialog {
+  display: grid;
+  gap: 12px;
+}
+
+.confirmation-dialog h2,
+.confirmation-dialog p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.confirmation-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.confirmation-actions button {
+  min-height: 44px;
+}

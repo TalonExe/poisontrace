@@ -1,6 +1,8 @@
+import { useContentReadOnly, readOnlyContentMessage } from "../../components/ContentPolicy";
 import React, { useEffect, useState } from "react";
 import { Sidebar } from "../../components/layout/Sidebar";
 import { CaseGroundTruthEditor } from "./CaseGroundTruthEditor";
+import { CaseOptions } from "./CaseOptions";
 
 export function ResearchCaseAuthoring({
   runner,
@@ -12,6 +14,7 @@ export function ResearchCaseAuthoring({
   onResults,
   onScenarios,
 }) {
+  const readOnly = useContentReadOnly();
   const [cases, setCases] = useState([]);
   const [caseId, setCaseId] = useState("");
   const [loading, setLoading] = useState(true);
@@ -57,10 +60,9 @@ export function ResearchCaseAuthoring({
       />
       <section className="welcome">
         <div>
-          <h1>MCP research case authoring</h1>
+          <h1>{readOnly ? "MCP research cases" : "MCP research case authoring"}</h1>
           <p>
-            Advanced fixture authoring. Select a research case to revise its
-            expected decision and attacker targets.
+            {readOnly ? readOnlyContentMessage : "Advanced fixture authoring. Select a research case to revise its expected decision and attacker targets."}
           </p>
           <button
             className="text-button"
@@ -72,10 +74,10 @@ export function ResearchCaseAuthoring({
         </div>
       </section>
       <article className="card">
-        <h2>MCP research cases</h2>
+        <h2>{readOnly ? "Curated cases" : "MCP research cases"}</h2>
         <p>
           These read-only MCP evidence cases are separate from Metadata
-          scenarios (YAML). Saving ground truth creates a new case version.
+          scenarios (YAML). {readOnly ? "Select a case to inspect its curated ground truth." : "Saving ground truth creates a new case version."}{" "}
           Existing results and group reruns retain their saved labels, evidence
           and targets. Experiment reloads current versions when you return.
         </p>
@@ -105,11 +107,7 @@ export function ResearchCaseAuthoring({
             disabled={loading || saving || !cases.length}
             onChange={(e) => setCaseId(e.target.value)}
           >
-            {cases.map((item) => (
-              <option key={item.case_id} value={item.case_id}>
-                {item.name} · {item.case_id} · v{item.case_version}
-              </option>
-            ))}
+            <CaseOptions cases={cases} showCaseId />
           </select>
         </label>
         {caseId && !loading && !error && (

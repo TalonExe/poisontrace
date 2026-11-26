@@ -1,148 +1,94 @@
-# PoisonTrace backend architecture
+# PoisonTrace architecture
 
-Current structure after compatibility retirement, 2026-11-03. This guide describes the source tree as it exists now. STATUS.md records verification and prior slices. ADRs 0001, 0002 and 0003 remain authoritative. Earlier architecture-guide versions are review artifacts in .scratch/backend-cleanup-docs-before.zip.
+This document describes current module ownership and test seams. [STATUS.md](STATUS.md) owns implementation and verification state. The [domain glossary](DOMAIN_GLOSSARY.md) and accepted [ADRs](adr/) define terminology and decisions. Dated implementation-pending statements in ADRs record their adoption context; current source and STATUS establish what is implemented.
 
-## Where code belongs
+## Module map
 
-The package is backend/src/poisontrace. It has 48 Python source files, including package initializers, down from 67 before compatibility retirement.
+Paths are relative to `backend/src/poisontrace/` unless stated otherwise.
 
-| Location | Owns |
+| Module | Responsibility |
 | --- | --- |
-| domain/values.py | Scenario, tools, model decisions, experiment modes and results |
-| domain/rules.py | Injection marker and pure output redaction |
-| domain/metrics.py | Benchmark metric calculations |
-| application/runs.py | Run creation, history, detail and summaries |
-| application/campaigns.py | Campaign creation, execution, aggregation, child associations and reruns |
-| application/credentials.py | Credential operations, provider matching support and masked responses |
-| application/scenarios.py | Scenario CRUD, identity allocation and usable-scenario lookup |
-| application/accounts.py | Account/session use cases, hashing, lifecycle rules and transactional account interfaces |
-| application/execution.py | ScenarioRunner execution coordination and trace recording |
-| application/benchmark.py | Repeated-trial execution coordination |
-| application/gateway.py | ToolGateway manifest checks and protected-action approval |
-| application/ports.py | Application-owned model, scenario, trace/run, campaign and secret interfaces |
-| application/contracts.py | Request/response types used by the implementation |
-| application/errors.py | ScenarioNotFound, the explicit run lookup error |
-| adapters/models/ | Fake, OpenAI and Gemini implementations |
-| adapters/persistence/ | Trace, campaign and account records; in-memory stores; shared SQLite setup |
-| adapters/scenarios/ | YAML parsing, filesystem documents, atomic writes and campaign filename selection/reload |
-| adapters/secrets/storage.py | Encrypted SQLite and injected managed-secret implementations |
-| interfaces/http/ | HTTP translation, authentication/role checks and routers |
-| interfaces/cli.py | Benchmark CLI argument parsing and output |
-| config.py | Immutable paths, encryption-key validation and repr-redacted seed configuration |
-| bootstrap.py | Concrete dependency construction and explicit composition |
-| web.py, __main__.py | Thin HTTP and CLI entrypoints |
-| launcher.py | Local API/dashboard process launcher used by scripts/launch.py |
+| `domain/` | Scenario/investigation values, fixed attacks, independent scoring and pure aggregation, including matched-comparison eligibility. |
+| `application/runs.py`, `execution.py`, `benchmark.py` | Metadata execution, history, detail and repeat coordination. Saved IDs return directly; callers never infer attribution from the latest record. |
+| `application/investigation.py` | Bounded evidence loop, model continuation, reference validation, manifest observations and safe saved failures. |
+| `application/gateway.py` | Simulated metadata permission decisions and separately qualified read-only MCP invocation policy. |
+| `application/run_groups.py` | Validate and pin matched plans, authorize reads, calculate progress and compare retained attempts. Old request-bound create/execute entrypoints fail closed. |
+| `application/jobs.py` | Durable MCP investigation, matched-group, metadata run and campaign submissions, idempotency, schedule limits and execution under the recorded analyst scope. |
+| `application/campaigns.py` | Filename-based campaign selection, pre-admission validation, retained reruns and child summaries. |
+| `application/accounts.py`, `principals.py` | Transactional account/session rules and trusted caller identity. |
+| `application/credentials.py`, `scenarios.py`, `content_policy.py` | Credential operations, YAML identity/repair and local/hosted mutation policy. |
+| `application/ports.py`, `contracts.py`, `errors.py` | Application-owned interfaces, exchanged values and explicit errors. |
+| `adapters/models/` | Metadata and evidence-continuation provider adapters; fake/scripted models support offline checks. |
+| `adapters/mcp/` | Immutable corpus/manifest, versioned local ground-truth overrides, two fixed stdio servers, discovery/schema validation and child lifecycle. |
+| `adapters/persistence/` | SQLite schemas and account/run/campaign/group/job records; in-memory stores support trusted callers and CLI execution. |
+| `adapters/execution/jobs.py` | Supervised spawned executor, exclusive OS lock, watchdog and descendant cleanup. |
+| `adapters/scenarios/`, `adapters/secrets/` | YAML/filesystem persistence and owner-authorized encrypted or injected managed-secret storage. |
+| `interfaces/http/`, `interfaces/cli.py` | HTTP/auth/role translation and CLI argument/result translation. |
+| `bootstrap.py`, `config.py` | Concrete dependency construction and immutable validated configuration. |
+| `production.py`, `web.py`, `__main__.py`, `launcher.py` | Production composition, development web/CLI entrypoints and local process launch. |
 
-Package __init__.py files identify packages. domain/__init__.py also provides the intentional public domain-value interface. They do not eagerly import concrete providers or application startup.
+## Dependency rules
 
-## How to enter the backend
+Domain modules use only the standard library and other domain modules. Application modules use domain values and application-owned interfaces; they never import adapters, bootstrap, configuration, HTTP, SQLite, vendor SDKs or MCP transport types. Bootstrap supplies concrete adapters. HTTP and CLI translate requests and results rather than constructing execution dependencies.
 
-- Use bootstrap.build_backend(WebConfig(...), secrets, model_factory=...) for explicit application composition. The model factory is injectable; omitted secret storage remains unavailable to credential use cases.
-- Use bootstrap.build_web_backend(config=..., managed_secret_client=...) for configured web startup. Local storage requires a valid encryption key; an injected managed client does not need a local key/database.
-- Use bootstrap.build_accounts(database, seeds=...) for account composition. Omitting seeds reads the existing environment configuration; explicit seeds support isolated tests.
-- Use bootstrap.create_app(backend) to compose HTTP with one shared authentication instance. No-argument construction remains provider-key optional. interfaces/http/app.py receives authentication explicitly and does not construct dependencies or call back into bootstrap.
-- Launch HTTP with uvicorn poisontrace.web:app. Launch benchmark commands with python -m poisontrace. scripts/launch.py starts the local API/dashboard processes.
+Model adapters translate provider requests and responses without invoking tools or owning persistence. MCP transport owns SDK connections, fixed child commands and schema validation. SQL belongs in persistence adapters; account transactions are expressed through application-owned account-record interfaces. ToolGateway remains the invocation seam.
 
-Backend is a group of constructed dependencies, not another use-case facade. Call backend.runs, backend.campaign_service, backend.scenario_service or backend.credentials directly. backend.store, backend.campaigns and backend.scenarios are the concrete run, campaign and scenario stores supplied to those use cases.
+Keep one canonical implementation for each responsibility. Retired root compatibility modules and RunWebAdapter must not return. A module earns its interface by owning behavior; forwarding-only aliases and speculative interfaces add no depth. Keep independently meaningful modules rather than merging them merely to reduce file count.
 
-## Interfaces and dependency direction
+## Composition and runtime
 
-Domain modules depend only on the standard library and other domain modules. Metrics operate on completed experiment results without models, transport or storage. Application modules depend on domain values and application-owned interfaces, never concrete adapters, configuration, HTTP, CLI or bootstrap. Bootstrap supplies the concrete adapters. HTTP and CLI translate user inputs/results and invoke the application modules.
+`build_backend(WebConfig(...), secrets, ...)` supports injected model factories and explicit application composition. `build_web_backend` supplies encrypted local secrets or an injected managed client. `build_accounts` supplies transactional accounts; explicit empty seeds prevent development seeding. HTTP receives one authentication instance and the executor factory.
 
-ScenarioRunner receives AgentModel, TraceStore and ToolGateway. ToolGateway remains the only tool invocation seam. Model responses, discoveries, decisions, blocked attempts, results and recommendations retain their ordered traces. BenchmarkRunner receives a runner factory; bootstrap creates fresh model/trace state for every trial and preserves the distinct single-run approval and benchmark high-impact policies.
+Production uses `python -m poisontrace.production serve`, one Uvicorn worker, built frontend assets and same-origin HTTP. Configuration is validated before storage creation. Packaged immutable seeds initialize missing YAML once without replacing edits or reintroducing deletions after the marker exists. Health readiness probes storage and assets without recreating missing databases. See [CONTAINER.md](../CONTAINER.md) for paths, recovery commands, isolation and proxy requirements.
 
-ScenarioRepository hides YAML serialization and paths. ScenarioService owns identifier allocation, immutable update identity, draft creation fallback and the usable-scenario gate. Invalid files remain visible and repairable. CampaignScenarioFiles deliberately retains sorted poisoned-filename selection and reload, including the known invalid-file selection issue.
+The main SQLite database contains accounts/sessions, traces/runs, campaigns, groups/attempts and execution jobs. Encrypted credentials use a separate database; YAML scenarios and JSON ground-truth overrides are separate state. Browser configurations are account-scoped localStorage. Coordinated backup must include all durable state and separately recovered encryption material.
 
-AccountStore supplies transaction-scoped AccountRecords. Application accounts own normalization, scrypt hashing, token generation/hashing, active-account checks and last-active-superadmin restrictions. SQLite owns SQL and the existing commit/rollback scope. Seed usernames, missing-passcode skipping and INSERT OR IGNORE semantics are unchanged. Browser investigation configurations remain distinct from authentication sessions.
+## Workflow and measurement seams
 
-Shared SQLite setup remains in adapters/persistence/support.py. Trace, campaign and account stores initialize the same schema. No schema or data migration accompanied this cleanup. Secret storage retains encryption, masks, revocation and managed-client behavior; managed reference metadata still resides in memory.
+Metadata execution selects matched trusted/discovered definitions, produces a recommendation, then evaluates simulated permissions. It retrieves no evidence or external tool result. Recommendation-v1 scoring and gateway-v1 observations preserve nullable outcomes and legacy meanings. [The metadata measurement contract](research/SLICE_ONE_MEASUREMENTS.md) defines denominators.
 
-## Compatibility retirement
+MCP investigations discover two fixed servers, apply manifest policy before exposure/invocation, gather permitted evidence and feed observations back to the model before a structured final decision. Ground truth and attacker targets never enter model input or the child snapshot. The loop retains four calls, a cooperative 20-second deadline and 16,384-byte output bounds. Provider/transport cleanup is bounded.
 
-There is now one canonical import path for each implementation. The old root agent, provider-model, trace, persistence, scenario, secrets, users, runner, gateway, benchmark, metrics and CLI modules are removed. web_adapter.py and RunWebAdapter are removed. bootstrap.build_adapter was replaced by build_web_backend, which returns Backend directly. The ScenarioStore alias is removed; use YamlScenarioRepository.
+The fifteen-case corpus, canonical close/escalate handling, fixed v2 payloads and investigation-scoring-v1 keep field correctness, joint correctness, explicit attacker predicates, raw marker availability, reference membership and actual policy observations independent. Historical v1 payloads and saved records are not reinterpreted through the active catalog. See [investigation](research/CLEAN_MCP_INVESTIGATION.md), [corpus](research/SYNTHETIC_RESEARCH_CORPUS.md) and [payload](research/MCP_PAYLOAD_REVISION_V2.md) contracts.
 
-This intentionally retires the old Python imports, database-path UserSessionService constructor and forwarding methods. Repository consumers and behavioral tests use the canonical modules. HTTP routes, request/response behavior, CLI commands and storage formats are unchanged. External Python callers must migrate to the paths and factories above.
+Matched groups pin case/evidence/ground truth/targets, provider/model, payload, prompts/schema/settings, approved definitions and scoring contracts. Intended condition exposure/enforcement differences are eligible; unrelated historical runs are not recruited. Reruns append attempts, using saved inputs and a current owned credential reference. Changed runtime/payload requires a new group. Missing or incompatible observations never become scored failures. See [matched groups](research/MATCHED_RUN_GROUPS.md).
 
-Unused placeholder errors, duplicate trace protocols and unconsumed scenario/campaign DTOs were removed. Actual TraceEvent and storage interfaces remain in application/ports.py. Tests of retired export identity were removed; behavior tests were migrated, and isolated import checks are consolidated in backend/tests/test_imports.py.
+## Ownership, content and accounts
 
-## Verification and remaining behavior work
+HTTP establishes a `Principal` solely from backend authentication. Context-managed scope propagates to worker threads/async tasks and resets on exit. Credential stores filter the analyst owner before metadata or decryption. Run, group and campaign modules authorize before reading outcomes, plans or children. Foreign and unknown identifiers share safe denials. Persistence mutation transactions recheck parent/child ownership. NULL legacy owners remain quarantined without reassignment or rescoring.
 
-Run .venv/Scripts/python.exe -m pytest -q and .venv/Scripts/python.exe -m compileall -q backend/src backend/tests. Dependency checks live in test_architecture_boundaries.py; behavior tests exercise application, adapter and HTTP interfaces. The source/test pre-cleanup snapshot is .scratch/backend-cleanup-before.zip. It contains source review copies, not runtime input.
+Provider execution resolves an owned credential reference at use time, with no web fallback to host provider keys. Revocation prevents later retrieval but cannot recall an in-flight client. Managed-secret reference metadata remains process-local; the injected adapter is not a configured durable cloud integration.
 
-The reorganization did not fix run attribution. Slice one now returns saved run identifiers directly; non-atomic campaign claims, campaign eligibility, request-bound execution without recovery or missing per-user credential/run/campaign/child-trace ownership. Public BYOK privacy, curated read-only scenarios, bounded sessions, runtime packaging and deployment prerequisites remain pending under ADR 0003. Keep those as separately tested behavior changes. Do not infer concurrency, live-provider, clean-install, full-e2e or deployment readiness from the structural checks.
+Hosted content policy denies YAML and ground-truth mutations before lookup/validation/persistence. Local authoring, invalid-file repair, immutable IDs and stale-version checks remain. The browser capability controls presentation; application enforcement is authoritative.
 
+Sessions have a fixed eight-hour expiry without sliding renewal. Logout, disable, role changes and passcode reset invalidate affected sessions. Hosted policy validates HTTPS, exact configured Host/write Origin and explicit immediate proxy peers; Secure cookies do not depend on untrusted headers. Login reserves bounded persistent account/client/global throttle buckets before hashing. API responses are no-store; hosted docs/OpenAPI are denied. Uvicorn proxy rewriting stays disabled.
 
-## Slice-one execution and measurement, 2026-11-11
+Superadmins manage users without analyst-workspace access. Analyst passcode reset reauthenticates the actor inside the write transaction and revokes only the target's sessions. Operator-only hidden-input recovery requires an existing superadmin, never creates/promotes accounts and requires explicit disabled-account enablement. Reset/recovery preserves identity, private credentials/history and already admitted execution.
 
-ScenarioRunner selects matched-v1 condition inputs, catches started-attempt failures, records independent recommendation-v1 outcomes and gateway-v1 observations, and returns the saved run ID on ExperimentResult. Model factories are deferred into the attempted execution boundary. Single-run/campaign attribution uses that returned ID. For metadata experiments, ToolGateway.invoke remains the post-completion simulated permission seam; it executes no external MCP tool. The separately versioned MCP path described below uses invoke_evidence for actual reads.
+## Durable execution
 
-SqliteTraceStore adds outcome_evidence JSON without rewriting historical records. Domain metrics exclude incompatible historic security/task measurements and report counts/denominators per condition; system errors include all saved attempts. RunApplicationService.metrics and GET /api/runs/summary expose history aggregation. Campaign rates include retained rerun attempts, while scenario rows show latest associated children. Results reuses MeasurementSummary and outcomePresentation for accurate labels; Dashboard retains execution and brief recent activity. See [measurement contract](research/SLICE_ONE_MEASUREMENTS.md) for nullable outcomes, compatibility aliases and formulas.
+Single and matched-group POSTs require owner-scoped idempotency intents and return HTTP 202 with durable identifiers. Exact intent/input repeats reopen the original job, including terminal jobs. Conflicting reuse or busy work allocates nothing. Requests are bounded to 4,096 body bytes and 200 UTF-8 bytes per selection string. Hosted groups permit one repeat and at most three unique conditions, rechecked at execution after a profile switch.
 
-Non-atomic claims, invalid-file campaign selection, mutable campaign inputs, request-bound execution without recovery, and missing per-user ownership remain. Automated tests demonstrate offline implementation behavior only.
+SqliteJobStore admits one outstanding queued/active job globally through an immediate transaction and partial unique index. It persists a group's parent, job and all slots atomically. One spawned worker holds the database-adjacent OS lock; claims have finite 60-second leases and one-time dispatch. Each group attempt renews the lease and receives a separate 45-second process watchdog. Windows uses Job Objects; POSIX uses process groups with Linux parent-death termination.
 
+SqliteTraceStore commits result, directly returned run ID, trace association and owning attempt link together after validating the active owner/claim/lease. The last result also finishes the group/job. Ordinary saved failures do not stop a group schedule. Process/storage interruption preserves saved children, marks active slots interrupted/uncertain and unstarted slots missing, and never replays interrupted work. Queued undispatched work may start after restart. Explicit reruns can append to older request-bound groups retaining a running label; their old missing slots remain unchanged.
 
-## Dashboard and Results separation, 2026-11-11
+The same admission slot covers metadata singles, campaign executions and per-scenario reruns. Metadata submissions snapshot the selected scenario at admission. Campaign creation records the usable poisoned filenames and reports excluded files. Execution revalidates the saved selection before admission and requires acknowledgement of newly excluded files. Each campaign execution is limited to 15 scenarios and each metadata job snapshot to 256 KiB. The supervised executor applies its 45-second watchdog to each attempt, and the synchronous SDK clients use 20-second transport timeouts without automatic retries.
 
-Ticket #20 moves review into frontend/src/features/results/. RunInspection and CampaignHistory retain existing outcome/trace and campaign inspection behavior. ResultsPage owns saved selection, loading/errors and Overview/Runs/Campaigns views. Dashboard owns configuration, launch, pending status and up to three recent entries. Both use the existing runner API; no backend, scoring or persistence contract changed.
+Campaign admission claims the parent and allocates the job and its attempt rows in one transaction. Saving each child atomically links its returned run ID to the job slot and campaign row. Explicit reruns append saved runs and replace the current child link only when a result saves. Interrupted jobs preserve saved links and report active or unstarted slots as interrupted or missing. Campaign runs retain simulated gateway permissions and recommendation scoring.
 
-Routes /results, /results/runs, /results/runs/:runId, /results/campaigns and /results/campaigns/:campaignId are analyst-only. App checks the authenticated role before rendering Results. Direct result review does not require a browser investigation configuration. Router content subscribes to pathname changes so parameter-only navigation updates the inspected record. Run and campaign completion navigate with the returned identifiers, never a global-latest lookup. Child links use saved child_run_id. Same-case comparison remains ticket #28.
+## Frontend
 
+The analyst landing page at `/activity` uses browser-local calendar boundaries with an exclusive end. The owner-scoped `GET /api/runs/activity` read returns saved investigation attempts, new groups, explicit reruns and the interrupted investigation job count for that interval. The dashboard and filtered Results use the same read to keep chart counts and matching records aligned. Provider totals count saved attempts. Token usage is unavailable.
 
-## First clean MCP investigation, 2026-11-11
+`frontend/src/app/App.jsx` composes authentication, account workspace remounts and route rendering directly from feature modules and LoginPage. The router owns URL normalization, navigation and parameter-only refresh. Distinct stable scenario create/detail keys retain editor state isolation; dashboard path and account workspace keys retain their existing remount behavior. Feature modules implement Configurations, Experiment, Results, content authoring and user management. HTTP calls use feature adapters and the shared client; reusable utilities do not import UI/app composition. Shared UI does not import pages or state utilities.
 
-application/investigation.py owns the bounded clean loop and safe saved failures. Application ports define InvestigationModel, EvidenceTransport/EvidenceSession and InvestigationCases. Domain values contain the fixture/model-input, qualified definition/call, observation, step and decision contracts. Model input deliberately excludes fixtures and ground truth. ToolGateway.invoke_evidence owns qualified read-only invocation; existing invoke retains its simulated legacy behavior. The new loop does not claim approved-manifest enforcement.
+Account-captured storage keeps late writes in the original namespace; identity changes unmount cached execution and Results. Current-generation 401 responses end the workspace, while stale responses cannot sign out a later login. Focus rechecks external cookie changes. Unscoped historical preferences are preserved without adoption.
 
-adapters/mcp/ owns the fixed JSON case library, separate stdio server and pinned SDK client/lifecycle. adapters/models/scripted_investigation.py implements offline evidence-dependent continuation. bootstrap supplies these to InvestigationRunner and RunApplicationService. No MCP SDK or transport types enter domain/application. The fixed case snapshot, full discovered definitions, connection identity, call/result ordering and final or partial evidence persist through existing run storage and HTTP detail, using additive outcome_evidence.investigation.
+Experiment retains exact pending requests/intents after uncertain responses and polls owned jobs after refresh. Results links actual saved IDs and shows completed/failed/interrupted/missing/queued/active slots. Decision correctness, attacker outcomes, policy observations and unavailable scores retain independent presentation. The overall group indicator is a display-only correct/compatible-attempt ratio, not a validated security benchmark. The visual system remains in `frontend/DESIGN.md`.
 
-GET /api/runs/investigation-cases lists the bundled fixture. POST /api/runs with workflow=mcp-investigation-v1 requires clean and scripted, without a credential. Existing requests default to metadata-v1. Results renders InvestigationOutcome only for investigation-unscored-v1; historical outcomes and recommendation-v1 remain unchanged. The new observations are excluded from existing security/correctness denominators. See research/CLEAN_MCP_INVESTIGATION.md for contracts, bounds, safety limits and real versus mocked verification.
+## Verification seams
 
+Test public application interfaces, authenticated HTTP behavior, persistence transactions, provider translation through offline SDK substitutes and real local MCP interactions. In-memory and SQLite trace adapters both have live uses; provider adapters vary at the model seam. Preserve foreign-owner denial, idempotency/concurrency, atomic association rollback, process loss, pinned reruns, legacy missing slots and nullable measurement reconstruction.
 
-## Gemini investigations, ticket #22, 2026-11-11
-
-adapters/models/gemini_investigation.py translates the provider-independent next_step contract into asynchronous SDK requests with structured JSON tool choice and returned-observation feedback. It does not invoke tools. RunApplicationService validates explicit Gemini configuration and supplies a request-local deferred model factory to InvestigationRunner. Bootstrap owns provider construction and permits an injected investigation model factory for offline checks. Keys remain in the factory/provider and never enter the MCP transport or saved configuration. The runner bounds provider cleanup and retains configured model identity on initialization failure. Existing metadata/campaign paths remain separate; MCP repeat groups belong to #28.
-
-
-## OpenAI investigations, ticket #23, 2026-11-12
-
-adapters/models/openai_investigation.py implements asynchronous Responses requests, strict structured call-or-decision output, local schema validation and owned-client cleanup. Provider types and JSON Schema mechanics remain in the adapter. Existing InvestigationRunner owns evidence feedback, gateway calls, validation, safe saved failures and returned IDs. RunApplicationService accepts explicit OpenAI model/credential references through the same request-local deferred factory as Gemini; bootstrap supplies the concrete provider. No new domain or persistence format is needed. Dashboard single-run and campaign requests share actual provider-model identifiers, fixing OpenAI single-run forwarding. Existing metadata reruns retain the campaign's saved model. MCP batch/repeats remain #28.
-
-
-## Controlled attacks, ticket #24, 2026-11-12
-
-Domain InvestigationAttack values select two fixed family/payload identities through the public domain interface. InvestigationRunner validates the condition, supplies the family to the EvidenceTransport port and saves attack/expected-decision provenance on completed and failed attempts. SyntheticCase.expected_decision stays outside model_input and the child process snapshot. No new storage schema or scoring version is introduced.
-
-LocalSocTransport composes two fresh ClientSession connections with AsyncExitStack and dispatches only by configured server identity. Each SocSession owns discovery and schema validation for its connection. The fixed FastMCP server builder has trusted SOC and controlled advisory roles; the latter receives the selected description before real discovery. Clean uses the same topology with an ordinary advisory description. RunApplicationService validates family/payload selections before credential resolution. Dashboard/Results reuse the existing launcher and inspection components. See research/CLEAN_MCP_INVESTIGATION.md for payloads, offline counterexamples and deferred defense/scoring boundaries.
-
-
-## Evidence manifest, ticket #25, 2026-11-12
-
-ToolGateway retains the unchanged metadata permission simulation and separately owns evidence_call_policy/invoke_evidence. Application EvidenceManifest compares complete qualified EvidenceTool values against a copied trusted tuple. InvestigationRunner checks every discovered definition before next_step and uses the same manifest at invocation. Bootstrap loads the reviewed static adapters/mcp/approved_manifest.json through approved_evidence_manifest; JSON Schema validation remains in that adapter. Explicit empty approvals are never replaced by discovery. No new SDK dependencies or persistence schema are needed.
-
-The additive investigation.manifest stores discovered/exposed definitions and independent restriction, rejection, successful returned-call and no-call observations. New condition provenance is manifest-mcp-v1; scoring stays investigation-unscored-v1. Results reads this nested evidence and preserves unavailable observations on older records. Provider requests receive only exposed copies. See research/CLEAN_MCP_INVESTIGATION.md for exact stages, counters, failures and offline evidence.
-
-
-## Structured investigation scoring, ticket #26, 2026-11-12
-
-Domain investigation_scoring.py validates exact supported decision predicates and calculates independent field, goal, marker and reference observations. investigation_metrics.py aggregates separately versioned MCP rates; domain.metrics exposes them additively under investigations without changing recommendation-v1 rate eligibility. Application InvestigationRunner validates returned references, consumes request-local raw text without persisting it, and saves additive investigation.scores/candidate diagnostics. API summaries expose investigation_scores and use joint correctness for presentation tone.
-
-SyntheticCase owns ground-truth validation. RunApplicationService handles restricted ground-truth editing through the InvestigationCases port; BundledCases owns local JSON overrides, stale-version checking and atomic replace. Bootstrap supplies a directory beside the run database. The editor changes only ground truth/category and increments case version; identity/evidence/payloads remain outside that API. Provider adapters attach raw output to InvestigationStep; provider/MCP types remain outside application/domain. Transport excludes all expected labels and targets from the child snapshot. Dashboard's small editor and Results/Overview consume these application contracts.
-
-## Corpus and canonical output, ticket #27, 2026-11-12
-
-BundledCases combines the retained authentication fixture with fourteen packaged corpus JSON files. Its catalog exposes category and immutable supported_attack_families; each case override uses its own identifier path. SyntheticCase checks nonempty read collections and unique evidence identifiers, and validates target allocation. Application creation rejects an unallocated attack before credential resolution or execution. ToolGateway remains the sole invocation seam. Transport excludes allocation along with ground truth from child snapshots. The wider event-evidence description has a matching reviewed manifest.
-
-InvestigationDecision now requires close/escalate, with recommendation detail retained in explanation. Provider schemas/prompts are v2; ScriptedInvestigationModel is scripted-soc-v2/evidence-loop-v2. Runner provenance records canonical-handling-v2. Exact investigation-scoring-v1 calculations and historical persistence parsing are unchanged; there is no rescore or fuzzy conversion. Existing HTTP/editor contracts work across all cases and preserve immutable evidence/allocation. See research/SYNTHETIC_RESEARCH_CORPUS.md for the rubric and public-seam verification.
-
-## Fixed payload revision v2, 2026-11-12
-
-The domain attack catalog now supplies soc-auth-description-v2 and soc-auth-shadow-v2. The same two families, transport selection, case allocation and ToolGateway seam apply. No provider, scoring, manifest or persistence format changes accompany this revision. Exact historical v1 and active v2 descriptions are archived in docs/research/payloads/, with primary-source rationale in research/MCP_PAYLOAD_REVISION_V2.md. Saved records retain their original payload/definition snapshots; active catalog changes do not reinterpret history.
-
-## Matched investigation groups, ticket #28, 2026-11-17
-
-application/run_groups.py creates and executes explicit selected-case schedules through RunApplicationService.prepare_investigation and InvestigationRunner.run_snapshot. The runner receives a pinned case for every attempt while ToolGateway remains the invocation seam. Bootstrap supplies provider prompt/schema/settings profiles and the SQLite group adapter. No case/target snapshot enters model input or the MCP child environment.
-
-adapters/persistence/run_groups.py owns additive run_groups/run_group_attempts tables, atomic execution claims and preallocated condition/repeat slots. Every saved result carries group_id/group_attempt/group_repeat and returns its run ID directly for association. Reruns append slots and preserve prior attempts. Execution stays synchronous and request-bound; process/storage-loss recovery is outside this slice. Unlinked slots remain missing, never fabricated failures.
-
-domain/run_groups.py checks each linked result against the immutable plan and calculates separately eligible per-condition rates. Full prompt/schema/settings, case/evidence/targets, payload, approved/discovered/exposed definitions and contract versions participate. Intended clean/poisoned/defended differences are checked against condition-specific expectations. Initialization failures without known prompt/settings remain excluded from matched rates but count in all-saved reliability. Missing requested conditions and conditions intentionally not scheduled are separate. Historical campaign/history aggregation remains unchanged.
-
-HTTP /api/run-groups supplies create/list/detail and POST /{group_id}/execute. Dashboard's Matched group controls execution and reruns; Results /results/groups/{group_id} supplies comparisons and individual run links. tests/test_run_groups.py exercises the application/HTTP/SQLite/real-MCP seams, including both offline SDK providers. Browser journeys cover group creation, refresh, evidence links, clean-control restrictions and retained reruns. See research/MATCHED_RUN_GROUPS.md for the exact contract and limitations.
+Architecture checks inspect dependency direction and retired imports. Browser checks cover account changes, deep links, reconnectable jobs, evidence references and role/content policy. [VERIFICATION.md](VERIFICATION.md) defines isolated Windows checks, cleanup and evidence semantics. Tests are consumers, never production dependencies. Current Linux/host/restore/capacity/live-provider gaps belong in STATUS, not inferred from passing offline checks.

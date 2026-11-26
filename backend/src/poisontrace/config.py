@@ -5,6 +5,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
+from ipaddress import ip_network
 
 
 @dataclass(frozen=True)
@@ -31,11 +33,37 @@ class WebConfig:
     database: Path = Path("poisontrace.db")
     secrets_database: Path = Path("poisontrace-secrets.db")
     secrets_key: bytes = field(default=b"", repr=False)
+    profile: str = "local"
+    public_origin: str = ""
+    trusted_proxy_cidrs: tuple[str, ...] = ()
+    recovery_ledger: Path | None = None
+
+    def __post_init__(self):
+        if self.profile not in {"local", "hosted"}:
+            raise ValueError("profile must be local or hosted")
+        for network in self.trusted_proxy_cidrs:
+            if ip_network(network).prefixlen == 0:
+                raise ValueError("proxy trust must use explicit bounded networks")
+
+    def validate_http(self):
+        if self.profile == "hosted":
+            parsed = urlsplit(self.public_origin)
+            if (parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password
+                    or parsed.path or parsed.query or parsed.fragment or parsed.netloc != parsed.netloc.lower()
+                    or any(c.isspace() for c in self.public_origin)):
+                raise ValueError("hosted PUBLIC_ORIGIN must be one canonical HTTPS origin without a path")
+            host = f"[{parsed.hostname}]" if ":" in parsed.hostname else parsed.hostname
+            canonical = f"https://{host}" + (f":{parsed.port}" if parsed.port and parsed.port != 443 else "")
+            if canonical != self.public_origin:
+                raise ValueError("hosted PUBLIC_ORIGIN must be canonical")
 
     @classmethod
     def from_environment(cls, environment: Mapping[str, str] | None = None) -> "WebConfig":
         environment = os.environ if environment is None else environment
-        return cls(secrets_key=environment.get("POISONTRACE_SECRETS_KEY", "").encode())
+        return cls(secrets_key=environment.get("POISONTRACE_SECRETS_KEY", "").encode(),
+                   profile=environment.get("POISONTRACE_PROFILE", "local"),
+                   public_origin=environment.get("POISONTRACE_PUBLIC_ORIGIN", ""),
+                   trusted_proxy_cidrs=tuple(filter(None, (part.strip() for part in environment.get("POISONTRACE_TRUSTED_PROXIES", "").split(",")))))
 
     def require_secrets_key(self) -> bytes:
         """Validate local encryption configuration before storage is constructed."""

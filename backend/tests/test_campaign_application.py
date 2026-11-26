@@ -22,7 +22,7 @@ def campaign_dependencies(tmp_path):
     for name in ("b-poisoned.yaml", "a-poisoned.yaml", "clean.yaml"):
         (directory / name).write_bytes(source.read_bytes())
     store = SqliteTraceStore(tmp_path / "runs.db")
-    campaigns = InMemoryCampaignStore()
+    campaigns = InMemoryCampaignStore(store)
     calls = []
     def factory(provider, model, api_key=None):
         calls.append((provider, model, api_key))
@@ -85,8 +85,7 @@ def test_campaign_failures_repair_and_credential_revalidation(campaign_dependenc
     path = directory / "a-poisoned.yaml"
     original = path.read_bytes()
     path.write_text("invalid: true", encoding="utf-8")
-    with pytest.raises(ValueError):
-        service.create({})
+    assert service.create({})["excluded_files"] == ["a-poisoned.yaml"]
     executed = service.execute(cid)
     assert executed["status"] == "completed_with_errors"
     assert (executed["completed"], executed["failed"]) == (1, 1)
@@ -98,7 +97,10 @@ def test_campaign_failures_repair_and_credential_revalidation(campaign_dependenc
     assert repaired["scenarios"][0]["error"] is None
     assert repaired["scenarios"][0]["outcome"] == "Marker observed"
     assert service.list()[0]["failed"] == 0
-    campaigns.associate_child_run(cid, 0, child_run_id=99999)
+    with pytest.raises(KeyError):
+        campaigns.associate_child_run(cid, 0, child_run_id=99999)
+    # Synthetic corrupt storage fixture, never a permitted application association.
+    campaigns.campaigns[cid]['scenarios'][0]['child_run_id'] = 99999
     assert service.get(cid)["scenarios"][0]["failure_state"] == "missing_child_run"
 
 def test_campaign_retains_provider_failures_and_uses_returned_ids(campaign_dependencies):
@@ -122,3 +124,7 @@ def test_campaign_retains_provider_failures_and_uses_returned_ids(campaign_depen
     assert service.list()[0]['completed'] == 0
     assert service.list()[0]['metrics']['system_error_rate'] == 1
     assert service.list()[0]['metrics']['by_condition']['poisoned']['attacker_goal']['value'] is None
+
+
+# Trusted caller for direct application checks; HTTP still authenticates independently.
+pytestmark = pytest.mark.usefixtures("application_analyst")

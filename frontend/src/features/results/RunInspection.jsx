@@ -1,9 +1,13 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { CardHead } from "../../components/common/Ui";
 import { outcomePresentation } from "../../utils/outcomePresentation";
 import { InvestigationOutcome } from "./InvestigationOutcome";
 
-export function RunInspection({ selectedRun }) {
+export function RunInspection({ selectedRun, traceOpen = false }) {
+  const traceHeading = useRef(null);
+  useEffect(() => {
+    if (traceOpen) traceHeading.current?.focus();
+  }, [traceOpen]);
   const selectedOutcomes = outcomePresentation(selectedRun);
   const investigation = [
     "investigation-unscored-v1",
@@ -77,8 +81,8 @@ export function RunInspection({ selectedRun }) {
           </div>
         </article>
       )}
-      <details className="card trace">
-        <summary>
+      <details className="card trace" open={traceOpen || undefined}>
+        <summary ref={traceHeading}>
           <h2>Recorded trace</h2>
           <span>Inspect the ordered events for this attempt</span>
         </summary>

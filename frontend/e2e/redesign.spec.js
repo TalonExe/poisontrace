@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./verification-test.js";
 
 test.beforeEach(async ({ page }) => {
   await page.route(
@@ -53,7 +53,7 @@ test("closing a new session leaves saved configurations unchanged", async ({
 }) => {
   await page.goto("/sessions");
   await expect(
-    page.getByRole("heading", { name: "Configurations", exact: true }),
+    page.getByRole("heading", { name: "Settings", exact: true }),
   ).toBeVisible();
   const count = await page.locator(".session-row").count();
   await page
@@ -95,7 +95,7 @@ test("mobile navigation remains available without an off-screen drawer", async (
     page.getByRole("navigation", { name: "Workspace navigation" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Configurations", exact: true }),
+    page.getByRole("button", { name: "Settings", exact: true }),
   ).toBeVisible();
   expect(
     await page.evaluate(

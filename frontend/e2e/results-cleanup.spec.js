@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./verification-test.js";
 
 const saved = {
   run_id: 901,

@@ -15,7 +15,9 @@
     "@tanstack/react-router": "^1.170.46",
     "@vitejs/plugin-react": "latest",
     "react": "latest",
+    "react-aria-components": "^1.22.1",
     "react-dom": "latest",
+    "recharts": "^3.11.1",
     "tailwindcss": "latest",
     "vite": "latest"
   },

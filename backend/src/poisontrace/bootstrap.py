@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+import time
 from typing import TYPE_CHECKING
 
 from poisontrace.adapters.models.fake import FakeModel
@@ -64,6 +65,9 @@ class Backend:
     runs: RunApplicationService
     campaign_service: CampaignApplicationService
     groups: object
+    web_config: WebConfig
+    jobs: object
+    executor_factory: Callable[[], object]
 
 
 def build_backend(
@@ -75,8 +79,10 @@ def build_backend(
 ) -> Backend:
     store = SqliteTraceStore(config.database)
     campaigns = SqliteCampaignStore(config.database)
-    scenarios = YamlScenarioRepository(config.scenario_dir)
-    scenario_service = ScenarioService(scenarios)
+    scenarios = YamlScenarioRepository(config.scenario_dir, getattr(secrets, "ledger", None))
+    from poisontrace.application.content_policy import ContentPolicy
+    content_policy = ContentPolicy(config.profile)
+    scenario_service = ScenarioService(scenarios, content_policy)
     credentials = CredentialApplicationService(secrets)
     from poisontrace.adapters.mcp.cases import BundledCases, approved_evidence_manifest
     from poisontrace.adapters.mcp.transport import LocalSocTransport
@@ -85,7 +91,7 @@ def build_backend(
 
     investigations = InvestigationRunner(store, BundledCases(config.database.parent / "investigation-cases"), LocalSocTransport(),
         ScriptedInvestigationModel, ToolGateway((), set()), approved_manifest=approved_evidence_manifest())
-    runs = RunApplicationService(store, scenario_service, model_factory, secrets, investigations, investigation_model_factory)
+    runs = RunApplicationService(store, scenario_service, model_factory, secrets, investigations, investigation_model_factory, content_policy=content_policy)
     campaign_service = CampaignApplicationService(
         campaigns, store, CampaignScenarioFiles(config.scenario_dir), model_factory, runs.summary, secrets,
     )
@@ -96,14 +102,18 @@ def build_backend(
     profiles = {provider: dict(prompt_version=model.prompt_version, settings=model.settings, prompt_snapshot=model.prompt_snapshot) for provider,model in
                 [('scripted',ScriptedInvestigationModel),('gemini',GeminiInvestigationModel),('openai',OpenAIInvestigationModel)]}
     groups = RunGroupService(SqliteRunGroupStore(config.database), runs, profiles)
-    return Backend(config.scenario_dir, store, campaigns, secrets, credentials, scenarios, scenario_service, runs, campaign_service, groups)
+    from poisontrace.adapters.persistence.jobs import SqliteJobStore
+    from poisontrace.application.jobs import JobService
+    jobs = JobService(SqliteJobStore(config.database), runs, groups, campaigns=campaign_service, profile=config.profile)
+    from poisontrace.adapters.execution.jobs import JobExecutor
+    return Backend(config.scenario_dir, store, campaigns, secrets, credentials, scenarios, scenario_service, runs, campaign_service, groups, config, jobs, lambda: JobExecutor(config))
 
 
 def build_local_secrets(config: WebConfig | None = None) -> EncryptedSqliteSecrets:
     from poisontrace.adapters.secrets.storage import EncryptedSqliteSecrets
 
     config = WebConfig.from_environment() if config is None else config
-    return EncryptedSqliteSecrets(config.secrets_database, config.require_secrets_key())
+    return EncryptedSqliteSecrets(config.secrets_database, config.require_secrets_key(), recovery_ledger=config.recovery_ledger)
 
 
 def build_web_backend(*, config: WebConfig | None = None, managed_secret_client: ManagedSecretClient | None = None) -> Backend:
@@ -115,13 +125,13 @@ def build_web_backend(*, config: WebConfig | None = None, managed_secret_client:
     return build_backend(config, secrets)
 
 
-def build_accounts(database: Path, *, seeds: tuple[AccountSeed, ...] | None = None) -> UserSessionService:
+def build_accounts(database: Path, *, seeds: tuple[AccountSeed, ...] | None = None, clock=time.time) -> UserSessionService:
     from poisontrace.adapters.persistence.accounts import SqliteAccountStore
     from poisontrace.application.accounts import UserSessionService
     from poisontrace.config import load_account_seeds
 
     configured = load_account_seeds() if seeds is None else seeds
-    service = UserSessionService(SqliteAccountStore(database))
+    service = UserSessionService(SqliteAccountStore(database), clock=clock)
     service.seed_demo_accounts((seed.username, seed.role, seed.passcode) for seed in configured)
     return service
 

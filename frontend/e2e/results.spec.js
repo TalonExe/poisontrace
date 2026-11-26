@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./verification-test.js";
 
 const run = (id, extra = {}) => ({
   run_id: id,
@@ -34,10 +34,10 @@ async function fixture(
             ? [{ scenario_id: "002", name: "Synthetic case", valid: true }]
             : path === "/api/runs/summary"
               ? {}
-              : path === "/api/runs"
-                ? route.request().method() === "POST"
-                  ? created
-                  : runs
+              : path === "/api/investigation-jobs" && route.request().method() === "POST"
+                ? { job_id: "metadata-job", run_id: created.run_id, status: created.status }
+                : path === "/api/runs"
+                  ? runs
                 : path.startsWith("/api/runs/")
                   ? [...runs, created].find(
                       (item) => item.run_id === Number(path.split("/").pop()),
@@ -85,7 +85,7 @@ test("Dashboard shows pending execution and preserves configuration after a reje
   const pending = new Promise((resolve) => {
     release = resolve;
   });
-  await page.route("**/api/runs", async (route) => {
+  await page.route("**/api/investigation-jobs", async (route) => {
     if (route.request().method() !== "POST") return route.fallback();
     await pending;
     await route.fulfill({
@@ -187,7 +187,7 @@ test("Results works without a saved session and preserves selection on refresh a
   page,
 }) => {
   await page.addInitScript(() =>
-    localStorage.setItem("poisontrace.synthetic.sessions", "[]"),
+    localStorage.setItem("poisontrace.account.analyst:researcher.poisontrace.synthetic.sessions", "[]"),
   );
   await fixture(page);
   await page.goto("/results/runs/2");
@@ -262,6 +262,41 @@ test("superadmin and signed-out users cannot enter Results", async ({
   ).toHaveCount(0);
 });
 
+test("long run history pages and searches within the Dashboard selection", async ({ page }) => {
+  const runs = Array.from({ length: 26 }, (_, index) => run(index + 1));
+  await fixture(page, { runs });
+  await page.route("**/api/runs/activity?**", route => route.fulfill({
+    json: {
+      attempts: runs.slice(0, 25).map(({ run_id }) => ({ run_id, status: "completed", provider: "scripted", at: 1795363201 })),
+      groups: [],
+      reruns: [],
+      interrupted: 0,
+    },
+  }));
+  const selection = "?start=1795363200&end=1795449600&metric=attempts&value=completed";
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`/results/runs${selection}`);
+  const history = page.getByRole("region", { name: "Run history entries" });
+  await expect(history.getByRole("button")).toHaveCount(10);
+  await page.getByRole("button", { name: "Next page" }).click();
+  await expect(page.getByText("11–20 of 25 runs")).toBeVisible();
+  await expect(history.getByRole("button", { name: /EXP-011/ })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  await page.screenshot({ path: test.info().outputPath("run-history-mobile.png"), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.screenshot({ path: test.info().outputPath("run-history-desktop.png"), fullPage: true });
+  await page.getByLabel("Filter runs").fill("EXP-025");
+  await expect(history.getByRole("button")).toHaveCount(1);
+  await history.getByRole("button", { name: /EXP-025/ }).press("Enter");
+  await expect(page).toHaveURL(`/results/runs/25${selection}`);
+  await expect(page.getByText("25 matching records")).toBeVisible();
+  await expect(page.locator(".outcome")).toContainText("Recommendation 25");
+  await page.reload();
+  await expect(history.getByRole("button", { name: /EXP-025/ })).toHaveAttribute("aria-pressed", "true");
+  await page.getByLabel("Filter runs").fill("EXP-026");
+  await expect(page.getByText("No runs match this filter.")).toBeVisible();
+});
+
 test("campaign execution opens its own saved campaign and child run", async ({
   page,
 }) => {
@@ -293,18 +328,22 @@ test("campaign execution opens its own saved campaign and child run", async ({
       json:
         path === "/api/campaigns" && route.request().method() === "GET"
           ? [campaign]
-          : campaign,
+          : path.endsWith("/execute")
+            ? { job_id: "campaign-job", campaign_id: campaign.campaign_id, status: "completed" }
+            : route.request().method() === "POST"
+              ? { ...campaign, excluded_files: ["broken-poisoned.yaml"] }
+              : campaign,
     });
   });
-  await page.goto("/dashboard/metadata");
-  await page.locator(".workspace-navigation summary").click();
-  await page.getByRole("button", { name: "Metadata campaigns", exact: true }).click();
+  await page.goto("/dashboard/campaign");
   await expect(
     page.getByRole("heading", { name: "Campaign history" }),
   ).toHaveCount(0);
   await page
     .getByRole("button", { name: "Run all poisoned scenarios" })
     .click();
+  await expect(page.getByText("Invalid scenario files excluded: broken-poisoned.yaml.")).toBeVisible();
+  await page.getByRole("button", { name: "Run usable poisoned scenarios" }).click();
   await expect(page).toHaveURL(/\/results\/campaigns\/CMP-created$/);
   await page.reload();
   await expect(

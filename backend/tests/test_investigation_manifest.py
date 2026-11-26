@@ -1,4 +1,5 @@
 """Manifest observations at policy, real transport and persisted HTTP seams."""
+from job_helpers import complete_investigation
 import asyncio
 from dataclasses import replace
 
@@ -14,7 +15,7 @@ from poisontrace.config import WebConfig
 def test_defended_withholds_discovered_attack_before_model_and_reopens(tmp_path, analyst_client, family):
     backend = build_backend(WebConfig(scenario_dir=tmp_path / 'scenarios', database=tmp_path / 'runs.db'))
     client = analyst_client(create_app(backend))
-    response = client.post('/api/runs', json={'workflow': 'mcp-investigation-v1', 'case_id': 'soc-auth-001',
+    response = complete_investigation(client, backend, {'workflow': 'mcp-investigation-v1', 'case_id': 'soc-auth-001',
         'provider': 'scripted', 'mode': 'defended', 'attack_family': family})
     assert response.status_code == 200, response.text
     detail = client.get(f"/api/runs/{response.json()['run_id']}").json()
@@ -133,3 +134,7 @@ def test_approved_file_rejects_invalid_json_schema_before_runner_construction(tm
     path.write_text(json.dumps(values))
     with pytest.raises(SchemaError):
         approved_evidence_manifest(path)
+
+
+# Direct application reopening uses an explicit trusted analyst.
+pytestmark = pytest.mark.usefixtures("application_analyst")

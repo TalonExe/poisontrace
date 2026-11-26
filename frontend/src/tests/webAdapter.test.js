@@ -81,13 +81,13 @@ test("loads and reruns one campaign scenario through the backend", async () => {
     campaign_id: "CMP-1",
     scenarios: [],
   });
-  assert.deepEqual(await adapter.rerunCampaignScenario("CMP-1", 2), {
+  assert.deepEqual(await adapter.rerunCampaignScenario("CMP-1", 2, "rerun-intent"), {
     campaign_id: "CMP-1",
     scenarios: [],
   });
   assert.deepEqual(calls, [
     ["/service/campaigns/CMP-1", {}],
-    ["/service/campaigns/CMP-1/scenarios/2/rerun", { method: "POST" }],
+    ["/service/campaigns/CMP-1/scenarios/2/rerun", { method: "POST", headers: { "Idempotency-Key": "rerun-intent" } }],
   ]);
 });
 
@@ -102,13 +102,14 @@ test("creates and executes an all-poisoned-scenarios campaign", async () => {
   });
 
   assert.deepEqual(
-    await adapter.runCampaign({
+    await adapter.createCampaign({
       provider: "fake",
       model: "workflow-model",
       credentialId: "cred-1",
     }),
     { campaign_id: "CMP-2", status: "completed" },
   );
+  await adapter.executeCampaign("CMP-2", "campaign-intent", ["broken.yaml"]);
   assert.deepEqual(calls, [
     [
       "/service/campaigns",
@@ -122,7 +123,11 @@ test("creates and executes an all-poisoned-scenarios campaign", async () => {
         }),
       },
     ],
-    ["/service/campaigns/CMP-2/execute", { method: "POST" }],
+    ["/service/campaigns/CMP-2/execute", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Idempotency-Key": "campaign-intent" },
+      body: JSON.stringify({ excluded_files: ["broken.yaml"] }),
+    }],
   ]);
 });
 
@@ -143,10 +148,11 @@ test("posts the selected session runner settings", async () => {
     }),
     { id: "EXP-002" },
   );
-  assert.equal(request[0], "/api/runs");
+  assert.equal(request[0], "/api/investigation-jobs");
   assert.equal(request[1].method, "POST");
   assert.equal(request[1].headers["Content-Type"], "application/json");
   assert.deepEqual(JSON.parse(request[1].body), {
+    workflow: "metadata-v1",
     scenario_id: "authentication-alert",
     mode: "defended",
     provider: "gemini",
@@ -172,6 +178,7 @@ test("passes a credential reference without retaining a secret", async () => {
     credentialId: "cred-123",
   });
   assert.deepEqual(JSON.parse(request[1].body), {
+    workflow: "metadata-v1",
     scenario_id: "x",
     mode: "clean",
     provider: "openai",
@@ -196,7 +203,9 @@ test("surfaces backend failures instead of creating local demo runs", async () =
 test("MCP investigations forward only the selected provider configuration", async () => {
   const calls = [];
   const adapter = createRunnerAdapter({fetchImpl: async (...args) => { calls.push(args); return response({run_id: 17}); }});
-  await adapter.runInvestigation({caseId: "soc-auth-001", provider: "gemini", model: "chosen-gemini", credentialId: "ref-1"});
+  await adapter.runInvestigation({caseId: "soc-auth-001", provider: "gemini", model: "chosen-gemini", credentialId: "ref-1", intent: 'synthetic-intent-001'});
+  assert.equal(calls[0][0], '/api/investigation-jobs');
+  assert.equal(calls[0][1].headers['Idempotency-Key'], 'synthetic-intent-001');
   assert.deepEqual(JSON.parse(calls[0][1].body), {workflow: "mcp-investigation-v1", case_id: "soc-auth-001", session_id: "", mode: "clean", provider: "gemini", model: "chosen-gemini", credential_id: "ref-1"});
   await adapter.runInvestigation({caseId: "soc-auth-001", credentialId: "must-not-forward"});
   assert.equal(JSON.parse(calls[1][1].body).credential_id, undefined);

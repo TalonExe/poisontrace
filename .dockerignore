@@ -1,0 +1,20 @@
+# Allowlist. No databases, credentials, logs, history, tools or review artifacts.
+**
+!Dockerfile
+!pyproject.toml
+!requirements-runtime.lock
+!backend/
+!backend/src/
+!backend/src/**
+backend/src/**/__pycache__/
+backend/src/**/*.pyc
+backend/src/*.egg-info/
+!frontend/
+!frontend/package.json
+!frontend/package-lock.json
+!frontend/index.html
+!frontend/vite.config.js
+!frontend/src/
+!frontend/src/**
+!frontend/public/
+!frontend/public/**

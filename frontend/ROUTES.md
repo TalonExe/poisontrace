@@ -5,8 +5,13 @@ PoisonTrace uses TanStack Router in `src/utils/router.js` with a small code-base
 | Route        | Responsibility                                                                      | Access        |
 | ------------ | ----------------------------------------------------------------------------------- | ------------- |
 | `/login`     | Local synthetic sign-in and invalid-credential feedback                             | Public        |
-| `/sessions`  | Create, edit, select, and remove local session configurations                       | Authenticated |
-| `/dashboard` | Execute one scenario and inspect runs and campaign history for the selected session | Authenticated |
+| `/activity`  | Analyst landing page for weekly and monthly investigation activity                    | Analyst       |
+| `/settings`  | Manage analyst-owned API keys and saved investigation configurations                 | Analyst       |
+| `/sessions`  | Legacy Settings entry point                                                        | Analyst       |
+| `/dashboard/single` | Set up one investigation, including the offline sample                       | Analyst       |
+| `/dashboard` | Configure and launch matched investigation groups                                  | Analyst       |
+| `/results/runs` | Reopen saved runs and dashboard attempt selections                                | Analyst       |
+| `/results/groups` | Review matched groups and dashboard group selections                             | Analyst       |
 | `/scenarios` | View the local scenario library and display configuration                           | Authenticated |
 
 Unknown paths normalize to `/login`. The app checks the local authentication seam before rendering protected pages. Sign-out clears the local session, drops the selected session, and replaces the current URL with `/login`.

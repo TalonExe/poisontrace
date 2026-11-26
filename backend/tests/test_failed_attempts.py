@@ -75,7 +75,8 @@ def test_http_failed_attempt_is_reopenable_and_safe(tmp_path, analyst_client):
             return json.loads('synthetic-secret invalid JSON')
     backend = build_backend(WebConfig(scenario_dir=directory, database=tmp_path / 'runs.db'), model_factory=lambda *args: Malformed())
     client = analyst_client(create_app(backend))
-    created = client.post('/api/runs', json={'scenario_id':'001', 'mode':'defended'}).json()
+    from job_helpers import complete_investigation
+    created = complete_investigation(client, backend, dict(workflow="metadata-v1", scenario_id="001", mode="defended")).json()
     detail = client.get(f"/api/runs/{created['run_id']}").json()
     assert detail['status'] == 'failed'
     assert detail['error_category'] == 'response_validation_error'
@@ -83,7 +84,7 @@ def test_http_failed_attempt_is_reopenable_and_safe(tmp_path, analyst_client):
     assert detail['execution_time_ms'] > 0
     assert client.get('/api/runs').json()[0]['status'] == 'failed'
     assert 'synthetic-secret' not in str(detail)
-    invalid = client.post('/api/runs', json={'scenario_id':'001', 'mode':'unknown'})
+    invalid = complete_investigation(client, backend, dict(workflow="metadata-v1", scenario_id="001", mode="unknown"))
     assert invalid.status_code == 400
     assert len(client.get('/api/runs').json()) == 1
 
@@ -104,7 +105,7 @@ def test_campaign_children_keep_their_returned_ids_during_overlapping_saves(tmp_
     source = Path('backend/tests/fixtures/scenarios/authentication-alert-poisoned-002.yaml')
     (directory / source.name).write_bytes(source.read_bytes())
     store = InterleavingStore(tmp_path / 'runs.db')
-    service = CampaignApplicationService(InMemoryCampaignStore(), store, CampaignScenarioFiles(directory), lambda *args: FakeModel(), RunApplicationService(store, None, None).summary)
+    service = CampaignApplicationService(InMemoryCampaignStore(store), store, CampaignScenarioFiles(directory), lambda *args: FakeModel(), RunApplicationService(store, None, None).summary)
     cid = service.create({})['campaign_id']
     service.execute(cid)
     assert service.get(cid)['scenarios'][0]['child_run_id'] == 1
@@ -134,3 +135,7 @@ def test_additive_migration_preserves_pre_slice_records(tmp_path):
     result = ScenarioRunner(FakeModel(), store, ToolGateway(scenario.approved_tools, set())).run(scenario, ExperimentMode.CLEAN)
     assert result.run_id == 10
     assert SqliteTraceStore(database).result_for(9) == saved
+
+
+# Trusted caller for direct application checks; HTTP still authenticates independently.
+pytestmark = pytest.mark.usefixtures("application_analyst")

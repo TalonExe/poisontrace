@@ -1,10 +1,10 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./verification-test.js";
 
 test("offline MCP entry needs no saved configuration and shares one execution selection", async ({
   page,
 }) => {
   await page.addInitScript(() =>
-    localStorage.setItem("poisontrace.synthetic.sessions", "[]"),
+    localStorage.setItem("poisontrace.account.analyst:researcher.poisontrace.synthetic.sessions", "[]"),
   );
   await page.route(
     (url) => url.pathname.startsWith("/api/"),
@@ -90,8 +90,8 @@ async function fixture(page) {
   const requests = [];
   await page.addInitScript(
     (configs) => {
-      if (localStorage.getItem("poisontrace.synthetic.sessions") === null)
-        localStorage.setItem("poisontrace.synthetic.sessions", JSON.stringify(configs));
+      if (localStorage.getItem("poisontrace.account.analyst:researcher.poisontrace.synthetic.sessions") === null)
+        localStorage.setItem("poisontrace.account.analyst:researcher.poisontrace.synthetic.sessions", JSON.stringify(configs));
     },
     configurations,
   );
@@ -218,7 +218,7 @@ for (const single of [false, true]) {
     expect(
       JSON.parse(
         await page.evaluate(() =>
-          localStorage.getItem("poisontrace.synthetic.sessions"),
+          localStorage.getItem("poisontrace.account.analyst:researcher.poisontrace.synthetic.sessions"),
         ),
       ),
     ).toEqual(configurations);
@@ -333,11 +333,12 @@ test("configuration editing and credential save/revoke retain legacy records", a
     page.locator(".session-row").filter({ hasText: "Legacy Gemini" });
   await row().getByRole("button", { name: "Edit", exact: true }).click();
   await page
-    .getByRole("textbox", { name: "Credential label", exact: true })
+    .getByRole("textbox", { name: "Key label", exact: true })
     .fill("New synthetic reference");
   await page.getByLabel("API key", { exact: true }).fill("synthetic-only-key");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(page.getByRole("status")).toContainText("Credential saved");
+  await page.getByRole("button", { name: "Add API key", exact: true }).click();
+  await expect(page.getByText("API key added.")).toBeVisible();
+  await page.getByLabel("API credential reference").selectOption("new-ref");
   await page
     .getByRole("button", { name: "Save configuration", exact: true })
     .click();
@@ -347,21 +348,20 @@ test("configuration editing and credential save/revoke retain legacy records", a
     page.getByRole("region", { name: "Execution selection" }),
   ).toContainText("New synthetic reference");
   await page
-    .getByRole("button", { name: "Configurations", exact: true })
+    .getByRole("button", { name: "Settings", exact: true })
     .click();
   await row().getByRole("button", { name: "Edit", exact: true }).click();
-  await page
-    .locator(".credential-row")
-    .filter({ hasText: "New synthetic reference" })
-    .getByRole("button", { name: "Revoke", exact: true })
-    .click();
-  await expect(page.getByRole("status")).toContainText("Credential revoked");
+  await page.getByRole("button", { name: "Revoke New synthetic reference" }).click();
+  await page.getByRole("dialog", { name: "Revoke New synthetic reference?" }).getByRole("button", { name: "Revoke API key" }).click();
+  await expect(page.getByText("API key revoked.")).toBeVisible();
+  await expect(page.getByLabel("API credential reference")).toHaveValue("new-ref");
+  await page.getByLabel("API credential reference").selectOption("");
   await page
     .getByRole("button", { name: "Save configuration", exact: true })
     .click();
   const records = JSON.parse(
     await page.evaluate(() =>
-      localStorage.getItem("poisontrace.synthetic.sessions"),
+      localStorage.getItem("poisontrace.account.analyst:researcher.poisontrace.synthetic.sessions"),
     ),
   );
   expect(records.find((c) => c.id === "legacy-g-7")).toMatchObject({

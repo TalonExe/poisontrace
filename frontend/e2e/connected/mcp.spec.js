@@ -1,6 +1,7 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../verification-test.js";
 
 test.afterAll(async ({ request }) => {
+  if (process.env.POISONTRACE_VERIFY_FAMILY) return;
   for (const port of [4175, 4174]) {
     await request.post(`http://127.0.0.1:${port}/__test_shutdown`);
   }
@@ -52,6 +53,8 @@ test(`real backend and MCP evidence survive browser refresh: ${family || "clean"
   await page
     .getByRole("button", { name: "Run MCP investigation", exact: true })
     .click();
+  await expect(page.getByRole("status", {name: "Investigation job"})).toContainText(/queued|active/);
+  await page.reload();
   await expect(page).toHaveURL(/\/results\/runs\/[1-9]\d*$/, {
     timeout: 30000,
   });
@@ -166,7 +169,7 @@ test('fifteen-case catalog selects controls and P2 incident with saved independe
     if (identifier==='soc-backup-002') {
       await expect(page.getByRole('combobox',{name:'Condition',exact:true}).locator('option')).toHaveCount(1);
       await expect(page.getByRole('button',{name:'Run MCP investigation',exact:true})).toBeEnabled();
-      await expect(page.getByRole('status')).toContainText('clean control');
+      await expect(page.getByRole('status').filter({hasText: 'This case is a clean control'})).toContainText('clean control');
     }
     await page.goto('/research-cases');
     await page.getByLabel('Research case',{exact:true}).selectOption(identifier);
@@ -213,22 +216,24 @@ test('matched groups retain six attempts, reopen and link real MCP evidence', as
   await page.getByRole('button',{name:'Run matched group',exact:true}).click();
   await expect(page).toHaveURL(/\/results\/groups\/[^/]+$/,{timeout:80000});
   await expect(page.getByRole('heading',{name:'Matched comparison',exact:true})).toBeVisible();
-  await expect(page.getByRole('link',{name:/Inspect attempt/})).toHaveCount(6);
+  await expect(page.getByRole('status',{name:'Group execution progress'})).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('link',{name:/View trace · Attempt/})).toHaveCount(6,{timeout:80000});
   await expect(page.getByText('No missing conditions.')).toBeVisible();
   await expect(page.getByRole('region',{name:'Overall experiment performance'})).toContainText('6 correct results from 6 attempts; 0 failed.');
   const path=new URL(page.url()).pathname;
   await page.reload();
-  await expect(page.getByRole('link',{name:/Inspect attempt/})).toHaveCount(6);
+  await expect(page.getByRole('link',{name:/View trace · Attempt/})).toHaveCount(6);
   for (const [width,height,name] of [[1440,1000,'desktop'],[390,844,'mobile']]) {
     await page.setViewportSize({width,height});
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
     await page.screenshot({path:`../.impeccable/review/matched-group-${name}.png`,fullPage:true});
   }
-  await page.getByRole('link',{name:/Inspect attempt 1 /}).click();
+  await page.getByRole('link',{name:/View trace · Attempt 1 /}).click();
   await expect(page.locator('.outcome')).toContainText('escalate');
   await expect(page.getByRole('region',{name:'Returned evidence'})).toContainText('unauthorized_access');
   await page.goto(path);
-  await expect(page.getByRole('link',{name:/Inspect attempt/})).toHaveCount(6);
+  await expect(page.getByRole('link',{name:/View trace · Attempt/})).toHaveCount(6);
 });
 
 test('clean-control group can be rerun from Experiment without replacing prior evidence', async ({page})=>{
@@ -251,7 +256,7 @@ test('clean-control group can be rerun from Experiment without replacing prior e
   await expect(page).toHaveURL(/\/results\/groups\/[^/]+$/,{timeout:30000});
   await expect(page.getByText('Not scheduled for this group: poisoned, defended.')).toBeVisible();
   const groupId=new URL(page.url()).pathname.split('/').pop();
-  const first=await page.getByRole('link',{name:/Inspect attempt 1 /}).getAttribute('href');
+  const first=await page.getByRole('link',{name:/View trace · Attempt 1 /}).getAttribute('href');
   // Revise only this isolated control after its first saved attempt.
   await page.goto('/research-cases');
   await page.getByRole('combobox',{name:'Research case',exact:true}).selectOption('soc-backup-002');
@@ -266,9 +271,9 @@ test('clean-control group can be rerun from Experiment without replacing prior e
   await page.getByLabel('Group source').selectOption(groupId);
   await expect(page.getByRole('complementary',{name:'Group specification'})).toContainText('v1');
   await page.getByRole('button',{name:'Rerun matched group',exact:true}).click();
-  await expect(page.getByRole('link',{name:/Inspect attempt/})).toHaveCount(2,{timeout:30000});
-  await expect(page.getByRole('link',{name:/Inspect attempt 1 /})).toHaveAttribute('href',first);
+  await expect(page.getByRole('link',{name:/View trace · Attempt/})).toHaveCount(2,{timeout:30000});
+  await expect(page.getByRole('link',{name:/View trace · Attempt 1 /})).toHaveAttribute('href',first);
   await page.reload();
-  await expect(page.getByRole('link',{name:/Inspect attempt/})).toHaveCount(2);
+  await expect(page.getByRole('link',{name:/View trace · Attempt/})).toHaveCount(2);
   await expect(page.getByRole('region',{name:'Overall experiment performance'})).toContainText('2 correct results from 2 attempts; 0 failed.');
 });

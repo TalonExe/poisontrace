@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoisonTrace · Run notification prototype</title>
+<style>
+:root {
+  font: 15px/1.5 system-ui,sans-serif;
+  color: #272e24;
+  background: #f8faf4;
+  --purple: #6c299a;
+  --border: #cbd3c2;
+  --muted: #56624e;
+}
+* { box-sizing: border-box }
+[hidden] { display: none !important }
+body { margin: 0; min-height: 100vh; display: grid; grid-template-columns: 218px minmax(0,1fr) }
+aside { background: #eaf0de; border-right: 1px solid var(--border); padding: 24px 18px }
+.brand { font-size: 21px; font-weight: 750; letter-spacing: -.04em; margin: 0 0 28px }
+nav, .tabs, .switch { display: flex; gap: 6px }
+nav { flex-direction: column }
+button, .action { font: inherit; padding: 8px 13px; border: 1px solid transparent; border-radius: 8px; color: inherit; background: transparent; cursor: pointer }
+button:focus-visible, a:focus-visible { outline: 2px solid var(--purple); outline-offset: 3px }
+nav button { text-align: left }
+button[aria-pressed="true"] { background: #eadcf4; color: var(--purple); font-weight: 650 }
+button:disabled { opacity: .55; cursor: default }
+main { width: 100%; max-width: 1100px; padding: 30px clamp(18px,4vw,55px) 255px }
+h1, h2, p { margin: 0 }
+h1 { font-size: 36px; letter-spacing: -.055em; margin-bottom: 16px }
+h2 { font-size: 18px; letter-spacing: -.02em }
+small, p { color: var(--muted) }
+.tabs { border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 18px }
+.cards { display: grid; grid-template-columns: 1.55fr 1fr; gap: 14px }
+.card, .notice, .switch { background: white; border: 1px solid var(--border); border-radius: 12px }
+.card { padding: 17px 19px }
+.card h2 { margin-bottom: 10px }
+dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 8px 18px }
+dt { color: var(--muted) }
+dd { margin: 0; font-weight: 600 }
+.action { display: inline-block; background: var(--purple); color: white; font-weight: 650; text-decoration: none; margin-top: 12px }
+.switch { position: fixed; bottom: max(12px,env(safe-area-inset-bottom)); left: 50%; transform: translateX(-50%); padding: 4px; white-space: nowrap }
+.switch button { font-size: 13px; padding: 5px 9px }
+.notice {
+  position: fixed;
+  z-index: 2;
+  width: min(375px,calc(100vw - 24px));
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 29px minmax(0,1fr) auto;
+  gap: 10px;
+  align-items: start;
+  box-shadow: 0 6px 22px #272e2424;
+}
+[data-placement="top"] .notice { top: 12px; left: 50%; transform: translateX(-50%) }
+[data-placement="bottom"] .notice { bottom: 62px; right: 12px }
+.notice p { font-size: 13px }
+.notice strong { display: block; line-height: 1.4 }
+.close { padding: 0 6px; line-height: 1.35; font-size: 20px }
+.indicator { display: grid; place-items: center; width: 29px; height: 29px; background: #f1e9f7; color: var(--purple); border-radius: 50% }
+.indicator::before { content: ""; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 1s linear infinite }
+[data-done="true"] .indicator { background: #e7f2e8; color: #27603f }
+[data-done="true"] .indicator::before { content: "✓"; width: auto; height: auto; border: 0; animation: none }
+@keyframes spin { to { transform: rotate(360deg) } }
+@media (min-width: 1000px) {
+  [data-placement="bottom"] .notice { right: 22px; bottom: 22px }
+}
+@media (max-width: 650px) {
+  body { display: block }
+  aside { display: flex; align-items: center; justify-content: space-between; padding: 9px 12px; border-right: 0; border-bottom: 1px solid var(--border) }
+  .brand { margin: 0; font-size: 17px }
+  nav { flex-direction: row; gap: 2px }
+  nav button { padding: 5px 7px; font-size: 13px }
+  main { padding-top: 17px }
+  .cards { grid-template-columns: 1fr }
+  [data-placement="top"] .notice { top: 53px }
+}
+@media (prefers-reduced-motion: reduce) { .indicator::before { animation: none } }
+</style>
+</head>
+<body>
+<aside>
+  <p class="brand">PoisonTrace</p>
+  <nav aria-label="Workspace">
+    <button type="button" id="experiment-nav" aria-pressed="true">Experiment</button>
+    <button type="button" id="results-nav" aria-pressed="false">Results</button>
+  </nav>
+</aside>
+<main>
+  <small>Design prototype · sample data</small>
+  <h1 id="heading">Experiment</h1>
+  <section id="experiment">
+    <div class="tabs" role="group" aria-label="Experiment type">
+      <button type="button" data-kind="single" aria-pressed="true">Single run</button>
+      <button type="button" data-kind="group" aria-pressed="false">Matched group</button>
+    </div>
+    <div class="cards">
+      <section class="card">
+        <h2>Investigation setup</h2>
+        <dl>
+          <dt>Case</dt><dd>Authentication alert</dd>
+          <dt>Conditions</dt><dd id="conditions">Clean</dd>
+          <dt>Model</dt><dd>Scripted offline</dd>
+        </dl>
+      </section>
+      <section class="card">
+        <h2 id="summary">Single run</h2>
+        <p id="summary-detail">1 investigation</p>
+        <button type="button" class="action" id="start">Start run</button>
+      </section>
+    </div>
+  </section>
+  <section class="card" id="results" hidden>
+    <h2 id="result-heading">Saved results</h2>
+    <p id="result-detail">The sample outcome will appear here when execution finishes.</p>
+  </section>
+</main>
+<section class="notice" aria-label="Run notification" id="notification" hidden>
+  <span class="indicator" aria-hidden="true"></span>
+  <div>
+    <div role="status" aria-atomic="true"><strong id="notice-title"></strong><p id="notice-detail"></p></div>
+    <a class="action" href="#sample-outcome" id="outcome-link" hidden>See the results</a>
+  </div>
+  <button type="button" class="close" id="dismiss" aria-label="Dismiss run notification" hidden>×</button>
+</section>
+<div class="switch" role="group" aria-label="Notification placement">
+  <button type="button" data-placement-option="top">Top center</button>
+  <button type="button" data-placement-option="bottom">Bottom right</button>
+</div>
+<script>
+const byId = id => document.getElementById(id);
+const kindButtons = document.querySelectorAll("[data-kind]");
+const placementButtons = document.querySelectorAll("[data-placement-option]");
+const start = byId("start");
+const notice = byId("notification");
+const outcomeLink = byId("outcome-link");
+const dismiss = byId("dismiss");
+const samples = {
+  single: {
+    label: "Single run", conditions: "Clean", summary: "1 investigation", start: "Start run",
+    result: "Saved run · Authentication alert", detail: "Clean · Scripted offline · Verdict: Benign"
+  },
+  group: {
+    label: "Matched group", conditions: "Clean, Poisoned, Defended", summary: "3 attempts · 1 per condition", start: "Start group",
+    result: "Group results · Authentication alert", detail: "3 of 3 attempts completed · Clean, Poisoned, Defended"
+  }
+};
+let selection = "single";
+let savedSample;
+let running = false;
+
+function setPlacement(placement) {
+  document.body.dataset.placement = placement;
+  for (const button of placementButtons) {
+    button.setAttribute("aria-pressed", String(button.dataset.placementOption === placement));
+  }
+}
+
+function showPage(results) {
+  byId("experiment").hidden = results;
+  byId("results").hidden = !results;
+  byId("heading").textContent = results ? "Results" : "Experiment";
+  byId("experiment-nav").setAttribute("aria-pressed", String(!results));
+  byId("results-nav").setAttribute("aria-pressed", String(results));
+  byId("result-heading").textContent = savedSample?.result ?? "Saved results";
+  byId("result-detail").textContent = savedSample?.detail ?? "The sample outcome will appear here when execution finishes.";
+}
+
+function showStatus(title, detail) {
+  byId("notice-title").textContent = title;
+  byId("notice-detail").textContent = detail;
+}
+
+function openOutcome() {
+  showPage(true);
+  notice.hidden = true;
+  byId("heading").tabIndex = -1;
+  byId("heading").focus();
+}
+
+for (const button of kindButtons) {
+  button.onclick = () => {
+    selection = button.dataset.kind;
+    for (const tab of kindButtons) tab.setAttribute("aria-pressed", String(tab === button));
+    const sample = samples[selection];
+    byId("conditions").textContent = sample.conditions;
+    byId("summary").textContent = sample.label;
+    byId("summary-detail").textContent = sample.summary;
+    start.textContent = sample.start;
+  };
+}
+for (const button of placementButtons) button.onclick = () => setPlacement(button.dataset.placementOption);
+setPlacement(new URLSearchParams(location.search).get("placement") === "bottom" ? "bottom" : "top");
+
+byId("experiment-nav").onclick = () => showPage(false);
+byId("results-nav").onclick = () => showPage(true);
+dismiss.onclick = () => {
+  notice.hidden = true;
+  (byId("results").hidden ? start : byId("results-nav")).focus();
+};
+outcomeLink.onclick = event => {
+  event.preventDefault();
+  location.hash = outcomeLink.hash;
+  openOutcome();
+};
+start.onclick = () => {
+  if (running) return;
+  if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+  const sample = samples[selection];
+  running = true;
+  start.disabled = true;
+  notice.dataset.done = "false";
+  outcomeLink.hidden = true;
+  dismiss.hidden = true;
+  notice.hidden = false;
+  showStatus("Starting…", sample.label + " · Authentication alert");
+  const group = selection === "group";
+  const stages = group ? ["0 of 3 attempts completed", "1 of 3 attempts completed", "2 of 3 attempts completed"] : ["Authentication alert · Scripted offline"];
+  stages.forEach((stage, index) => {
+    setTimeout(() => showStatus(sample.label + " running", stage), 650 + index * 1600);
+  });
+  setTimeout(() => {
+    savedSample = sample;
+    running = false;
+    start.disabled = false;
+    notice.dataset.done = "true";
+    showStatus(sample.label + " complete", group ? "3 of 3 attempts completed" : "Authentication alert · Saved run ready");
+    outcomeLink.href = group ? "#sample-group" : "#sample-run";
+    outcomeLink.hidden = false;
+    dismiss.hidden = false;
+    if (!byId("results").hidden) showPage(true);
+  }, group ? 5500 : 3200);
+};
+</script>
+</body>
+</html>

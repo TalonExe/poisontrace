@@ -1,3 +1,4 @@
+from poisontrace.application.principals import CredentialNotFound
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -19,6 +20,8 @@ def create_router(service: CredentialApplicationService):
     def save_credential(payload: dict[str, Any]):
         try:
             return service.save(payload)
+        except CredentialNotFound as exc:
+            raise HTTPException(status_code=404, detail="credential not found") from exc
         except (ValueError, KeyError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -26,6 +29,8 @@ def create_router(service: CredentialApplicationService):
     def replace_credential(credential_id: str, payload: dict[str, Any]):
         try:
             return service.replace(credential_id, payload)
+        except CredentialNotFound as exc:
+            raise HTTPException(status_code=404, detail="credential not found") from exc
         except (ValueError, KeyError) as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 

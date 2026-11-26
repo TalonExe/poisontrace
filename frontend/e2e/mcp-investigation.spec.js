@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./verification-test.js";
 
 test("attacked investigation selects a family and reopens saved payload provenance", async ({page}) => {
   let submitted;
@@ -13,7 +13,7 @@ test("attacked investigation selects a family and reopens saved payload provenan
     if(path === '/api/auth/session') data={user:{username:'researcher',role:'analyst'}};
     if(path === '/api/runs/investigation-cases') data=[{case_id:'soc-auth-001',case_version:'1',name:'Synthetic authentication',
       attacks:[{family:'description-poisoning',payload_id:'soc-auth-description-v2'},{family:'cross-server-shadowing',payload_id:'soc-auth-shadow-v2'}]}];
-    if(path === '/api/runs' && route.request().method() === 'POST') {submitted=route.request().postDataJSON();data=saved;}
+    if(path === '/api/investigation-jobs' && route.request().method() === 'POST') {submitted=route.request().postDataJSON();data=saved;}
     if(path === '/api/runs/71') data=saved;
     await route.fulfill({json:data});
   });
@@ -108,7 +108,7 @@ test("researcher runs an offline MCP case and reopens its structured evidence", 
             name: "Unrecognized privileged authentication",
           },
         ];
-      if (path === "/api/runs" && route.request().method() === "POST") {
+      if (path === "/api/investigation-jobs" && route.request().method() === "POST") {
         submitted = route.request().postDataJSON();
         data = result;
       }
@@ -232,7 +232,7 @@ test("failed MCP attempt keeps partial evidence and unavailable outcomes visible
         json:
           path === "/api/auth/session"
             ? { user: { username: "researcher", role: "analyst" } }
-            : path === "/api/runs"
+            : path === "/api/investigation-jobs"
               ? [failed]
               : path === "/api/runs/42"
                 ? failed
@@ -258,14 +258,14 @@ test("failed MCP attempt keeps partial evidence and unavailable outcomes visible
 
 test("Gemini investigation uses the configured session credential and actual model", async ({ page }) => {
   let submitted;
-  await page.addInitScript(() => localStorage.setItem('poisontrace.synthetic.sessions', JSON.stringify([{id:'session-1', name:'Gemini study', model:'gemini', credentialId:'private-ref'}])));
+  await page.addInitScript(() => localStorage.setItem('poisontrace.account.analyst:researcher.poisontrace.synthetic.sessions', JSON.stringify([{id:'session-1', name:'Gemini study', model:'gemini', credentialId:'private-ref'}])));
   await page.route(url => url.pathname.startsWith('/api/'), async route => {
     const path = new URL(route.request().url()).pathname;
     let data = [];
     if (path === '/api/credentials') data = [{credential_id:'private-ref',provider:'gemini',label:'Synthetic credential',masked:'***test'}];
     if (path === '/api/auth/session') data = {user:{username:'researcher',role:'analyst'}};
     if (path === '/api/runs/investigation-cases') data = [{case_id:'soc-auth-001',name:'Synthetic authentication',case_version:'1'}];
-    if (path === '/api/runs' && route.request().method() === 'POST') { submitted = route.request().postDataJSON(); data = {run_id:61}; }
+    if (path === '/api/investigation-jobs' && route.request().method() === 'POST') { submitted = route.request().postDataJSON(); data = {run_id:61}; }
     if (path === '/api/runs/61') data = {run_id:61, id:'EXP-061', status:'failed', scoring_version:'investigation-unscored-v1', error_category:'investigation_validation_error', workflow:'mcp-investigation-v1', model:'gemini-3.5-flash-lite', mode:'Clean', investigation:{case_id:'soc-auth-001',case_version:'1',decision:null,evidence:[]},trace:[]};
     await route.fulfill({json:data});
   });
@@ -288,14 +288,14 @@ test("Gemini investigation uses the configured session credential and actual mod
 
 test("OpenAI investigation uses the configured session credential and actual model", async ({ page }) => {
   let submitted;
-  await page.addInitScript(() => localStorage.setItem('poisontrace.synthetic.sessions', JSON.stringify([{id:'session-1', name:'OpenAI study', model:'openai', credentialId:'private-ref'}])));
+  await page.addInitScript(() => localStorage.setItem('poisontrace.account.analyst:researcher.poisontrace.synthetic.sessions', JSON.stringify([{id:'session-1', name:'OpenAI study', model:'openai', credentialId:'private-ref'}])));
   await page.route(url => url.pathname.startsWith('/api/'), async route => {
     const path = new URL(route.request().url()).pathname;
     let data = [];
     if (path === '/api/credentials') data = [{credential_id:'private-ref',provider:'openai',label:'Synthetic credential',masked:'***test'}];
     if (path === '/api/auth/session') data = {user:{username:'researcher',role:'analyst'}};
     if (path === '/api/runs/investigation-cases') data = [{case_id:'soc-auth-001',name:'Synthetic authentication',case_version:'1'}];
-    if (path === '/api/runs' && route.request().method() === 'POST') { submitted = route.request().postDataJSON(); data = {run_id:61}; }
+    if (path === '/api/investigation-jobs' && route.request().method() === 'POST') { submitted = route.request().postDataJSON(); data = {run_id:61}; }
     if (path === '/api/runs/61') data = {run_id:61, id:'EXP-061', status:'failed', scoring_version:'investigation-unscored-v1', error_category:'investigation_validation_error', workflow:'mcp-investigation-v1', model:'gpt-5-mini', mode:'Clean', investigation:{case_id:'soc-auth-001',case_version:'1',decision:null,evidence:[]},trace:[]};
     await route.fulfill({json:data});
   });
@@ -318,13 +318,13 @@ test("OpenAI investigation uses the configured session credential and actual mod
 
 test("OpenAI metadata single run and campaign forward gpt-5-mini", async ({page}) => {
   const submitted = [];
-  await page.addInitScript(() => localStorage.setItem('poisontrace.synthetic.sessions', JSON.stringify([{id:'session-1',name:'OpenAI configuration',model:'openai',credentialId:'private-ref'}])));
+  await page.addInitScript(() => localStorage.setItem('poisontrace.account.analyst:researcher.poisontrace.synthetic.sessions', JSON.stringify([{id:'session-1',name:'OpenAI configuration',model:'openai',credentialId:'private-ref'}])));
   await page.route(url => url.pathname.startsWith('/api/'), async route => {
     const path = new URL(route.request().url()).pathname;
     let data = [];
     if (path === '/api/auth/session') data = {user:{username:'researcher',role:'analyst'}};
     if (path === '/api/scenarios') data = [{scenario_id:'002',name:'Synthetic case',valid:true}];
-    if (route.request().method() === 'POST' && ['/api/runs','/api/campaigns'].includes(path)) {
+    if (route.request().method() === 'POST' && ['/api/investigation-jobs','/api/campaigns'].includes(path)) {
       submitted.push(route.request().postDataJSON());
       await route.fulfill({status:400,json:{detail:'Synthetic stop after request capture'}});
       return;
@@ -335,8 +335,7 @@ test("OpenAI metadata single run and campaign forward gpt-5-mini", async ({page}
   await page.getByRole('button',{name:'Run new experiment',exact:true}).click();
   await expect(page.getByRole('alert')).toContainText('Synthetic stop');
   expect(submitted[0]).toMatchObject({provider:'openai',model:'gpt-5-mini',credential_id:'private-ref'});
-  await page.locator('.workspace-navigation summary').click();
-  await page.getByRole('button',{name:'Metadata campaigns',exact:true}).click();
+  await page.goto('/dashboard/campaign');
   await page.getByRole('button',{name:'Run all poisoned scenarios',exact:true}).click();
   await expect.poll(() => submitted.length).toBe(2);
   expect(submitted[1]).toMatchObject({provider:'openai',model:'gpt-5-mini',credential_id:'private-ref'});
@@ -355,7 +354,7 @@ test("defended investigation explains restrictions independently of its final an
     if(path === '/api/auth/session') data={user:{username:'researcher',role:'analyst'}};
     if(path === '/api/runs/investigation-cases') data=[{case_id:'soc-auth-001',case_version:'1',name:'Synthetic authentication',
       attacks:[{family:'description-poisoning',payload_id:'soc-auth-description-v1'},{family:'cross-server-shadowing',payload_id:'soc-auth-shadow-v1'}]}];
-    if(path === '/api/runs' && route.request().method() === 'POST') {submitted=route.request().postDataJSON();data=saved;}
+    if(path === '/api/investigation-jobs' && route.request().method() === 'POST') {submitted=route.request().postDataJSON();data=saved;}
     if(path === '/api/runs/71') data=saved;
     await route.fulfill({json:data});
   });
@@ -401,7 +400,7 @@ test("case ground truth is versioned and structured scores reopen independently"
       data=caseData;
       if(route.request().method()==='PUT') {saved=route.request().postDataJSON();data={...caseData,...saved,case_version:'2'};}
     }
-    if(path==='/api/runs' && route.request().method()==='POST') data=result;
+    if(path==='/api/investigation-jobs' && route.request().method()==='POST') data=result;
     if(path==='/api/runs/88') data=result;
     await route.fulfill({json:data});
   });

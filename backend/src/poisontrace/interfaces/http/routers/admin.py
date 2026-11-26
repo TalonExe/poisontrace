@@ -37,4 +37,19 @@ def create_router(service: UserSessionService):
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    @router.post("/users/{user_id}/passcode")
+    def reset_passcode(user_id: int, payload: dict, request: Request):
+        require_superadmin(request)
+        try:
+            service.reset_analyst_passcode(request.cookies.get("poisontrace_session"), user_id, payload.get("passcode"))
+            return {"status": "passcode reset", "user_id": user_id}
+        except AuthenticationError as exc:
+            raise HTTPException(status_code=401, detail="Authentication required") from exc
+        except PermissionError as exc:
+            raise HTTPException(status_code=403, detail="Forbidden") from exc
+        except KeyError as exc:
+            raise HTTPException(status_code=404, detail="User not found") from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     return router

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./verification-test.js";
 import { fileURLToPath } from "node:url";
 
 async function fixture(page) {
@@ -108,7 +108,7 @@ test("Configurations provides direct history access without opening a configurat
   await fixture(page);
   await page.goto("/sessions");
   await expect(
-    page.getByRole("heading", { name: "Configurations", exact: true }),
+    page.getByRole("heading", { name: "Settings", exact: true }),
   ).toBeVisible();
   await captures(page, "configurations");
   await page
@@ -148,7 +148,7 @@ test("researcher reviews the exact offline attack setup before launch", async ({
       ],
     }),
   );
-  await page.route("**/api/runs", async (route) => {
+  await page.route("**/api/investigation-jobs", async (route) => {
     if (route.request().method() !== "POST") return route.fallback();
     submitted = route.request().postDataJSON();
     await route.fulfill({

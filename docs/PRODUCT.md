@@ -24,7 +24,7 @@ It evaluates observable security-policy violations caused by malicious MCP tool 
 
 ## Operating Context
 
-The dashboard is a local research prototype used during experiment setup, execution and saved evidence review. An open-source local edition and a public demonstration with operator-issued accounts and analyst-supplied model-provider keys are accepted distribution requirements. Public deployment and private multi-user ownership remain pending.
+The dashboard is a local research prototype used during experiment setup, execution and saved evidence review. An open-source local edition and a public demonstration with operator-issued accounts and analyst-supplied model-provider keys are accepted distribution requirements. Analyst ownership is implemented; public deployment readiness remains unverified.
 
 ## Capabilities and Constraints
 
@@ -41,7 +41,7 @@ The dashboard is a local research prototype used during experiment setup, execut
 - The primary dashboard action is starting a new experiment.
 - Keep the workspace responsive and fast during repeated research tasks.
 - Only synthetic incident data may be used. Do not connect production security systems or reuse external account passwords.
-- Model-provider keys are distinct from synthetic incident credentials. Keep secrets out of source, scenarios, traces and logs. The planned public edition requires analyst-owned encrypted provider keys until revocation and verified ownership controls before launch.
+- Model-provider keys are distinct from synthetic incident credentials. Keep secrets out of source, scenarios, traces and logs. Provider keys are owner-scoped and encrypted until revocation. Operational backup/revocation recovery and release gates remain required before hosted use.
 - Explicit matched groups pin one selected corpus case/version, provider/model, allocated attack, condition schedule and positive repeat count. Dashboard executes groups and retained reruns; Results compares compatible saved outcomes with counts, denominators, unavailable/missing observations and links to each attempt. Historical campaigns remain separate.
 
 ## Brand Commitments

@@ -1,4 +1,5 @@
 """Clean investigations at the HTTP/application/persisted-history seams."""
+from job_helpers import complete_investigation
 from poisontrace.bootstrap import build_backend, create_app
 from poisontrace.config import WebConfig
 from dataclasses import replace
@@ -34,10 +35,11 @@ def runner_for(tmp_path, model_factory=ScriptedInvestigationModel, case=None, **
 
 def test_analyst_runs_and_reopens_an_evidence_based_investigation(tmp_path, analyst_client):
     config = WebConfig(scenario_dir=tmp_path / "scenarios", database=tmp_path / "runs.db")
-    client = analyst_client(create_app(build_backend(config)))
+    backend = build_backend(config)
+    client = analyst_client(create_app(backend))
     cases = client.get("/api/runs/investigation-cases").json()
     assert cases[0]["case_id"] == "soc-auth-001"
-    created = client.post("/api/runs", json={"workflow": "mcp-investigation-v1", "case_id": "soc-auth-001",
+    created = complete_investigation(client, backend, {"workflow": "mcp-investigation-v1", "case_id": "soc-auth-001",
         "mode": "clean", "provider": "scripted"})
     assert created.status_code == 200, created.text
     summary = created.json()
@@ -156,5 +158,9 @@ def test_invalid_configuration_does_not_start_a_paid_or_saved_attempt(tmp_path, 
     client = analyst_client(create_app(backend))
     for changes in ({"provider": "openai"}, {"mode": "poisoned"}, {"credential_id": "do-not-resolve"}, {"case_id": "missing"}):
         payload = {"workflow": "mcp-investigation-v1", "case_id": "soc-auth-001", "mode": "clean", "provider": "scripted", **changes}
-        assert client.post("/api/runs", json=payload).status_code in {400, 404}
+        assert complete_investigation(client, backend, payload).status_code in {400, 404}
     assert backend.store.run_ids() == []
+
+
+# Trusted caller for direct application checks; HTTP still authenticates independently.
+pytestmark = pytest.mark.usefixtures("application_analyst")

@@ -34,14 +34,15 @@ def test_draft_repair_keeps_filename_identity_and_failed_write_keeps_original(tm
         service.get(draft["scenario_id"])
 
 
-def test_campaign_files_reload_and_still_reject_invalid_matching_files(tmp_path):
+def test_campaign_files_report_invalid_matches_and_allow_repair(tmp_path):
     source = Path("backend/tests/fixtures/scenarios/authentication-alert-poisoned-002.yaml").read_text(encoding="utf-8")
     path = tmp_path / "only-poisoned.yaml"
     path.write_text(source, encoding="utf-8")
     files = CampaignScenarioFiles(tmp_path)
-    assert files.select_poisoned() == [(path.name, "002")]
+    assert files.select_poisoned() == ([(path.name, "002")], [])
     path.write_text("invalid: true", encoding="utf-8")
     with pytest.raises(ValueError):
         files.load(path.name)
-    with pytest.raises(ValueError):
-        files.select_poisoned()
+    assert files.select_poisoned() == ([], [path.name])
+    path.write_text(source, encoding="utf-8")
+    assert files.select_poisoned() == ([(path.name, "002")], [])

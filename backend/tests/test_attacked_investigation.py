@@ -1,4 +1,5 @@
 """Controlled attack mechanics, never live-model effectiveness evidence."""
+from job_helpers import complete_investigation
 import asyncio
 
 import pytest
@@ -35,8 +36,8 @@ def test_attack_selection_persists_same_case_and_discovered_intervention(tmp_pat
     backend = build_backend(config)
     client = analyst_client(create_app(backend))
     base = {"workflow": "mcp-investigation-v1", "case_id": "soc-auth-001", "provider": "scripted"}
-    clean = client.post("/api/runs", json={**base, "mode": "clean"})
-    attacked = client.post("/api/runs", json={**base, "mode": "poisoned", "attack_family": family})
+    clean = complete_investigation(client, backend, {**base, "mode": "clean"})
+    attacked = complete_investigation(client, backend, {**base, "mode": "poisoned", "attack_family": family})
     assert attacked.status_code == 200, attacked.text
     clean_detail = client.get(f"/api/runs/{clean.json()['run_id']}").json()
     detail = client.get(f"/api/runs/{attacked.json()['run_id']}").json()
@@ -58,7 +59,7 @@ def test_attack_selection_persists_same_case_and_discovered_intervention(tmp_pat
     before = backend.store.run_ids()
     for changes in ({"attack_family": "unknown"}, {"mode": "clean", "attack_family": family},
                     {"mode": "defended", "attack_family": None}, {"attack_family": None}, {"payload_id": "caller-payload"}):
-        response = client.post("/api/runs", json={**base, "mode": "poisoned", "attack_family": family, **changes})
+        response = complete_investigation(client, backend, {**base, "mode": "poisoned", "attack_family": family, **changes})
         assert response.status_code == 400
     assert backend.store.run_ids() == before
 
@@ -114,3 +115,7 @@ def test_attacked_failure_retains_payload_partial_evidence_and_returned_id(tmp_p
     assert saved.investigation["decision"] is None
     assert saved.investigation["evidence"][0]["result"]["records"][0]["evidence_id"] == "alert-001"
     assert saved.recommendation_correctness is saved.attacker_goal_achievement is saved.marker_influence is None
+
+
+# Trusted caller for direct application checks; HTTP still authenticates independently.
+pytestmark = pytest.mark.usefixtures("application_analyst")

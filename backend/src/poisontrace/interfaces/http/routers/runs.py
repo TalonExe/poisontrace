@@ -1,7 +1,6 @@
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
-from poisontrace.application.errors import ScenarioNotFound
 from poisontrace.application.runs import RunApplicationService
 
 
@@ -15,6 +14,14 @@ def create_router(service: RunApplicationService):
     @router.get("/summary")
     def summary_metrics():
         return service.metrics()
+
+    @router.get("/activity")
+    def activity(start: int, end: int):
+        if not 0 < end - start <= 32 * 86400:
+            raise HTTPException(status_code=422, detail="Select a period of up to 32 days")
+        if not -62135596800 <= start < end <= 253402300799:
+            raise HTTPException(status_code=422, detail="Reporting dates are out of range")
+        return service.activity(start, end)
 
     @router.get("/investigation-cases")
     def investigation_cases():
@@ -45,11 +52,6 @@ def create_router(service: RunApplicationService):
 
     @router.post("")
     def create_run(payload: dict[str, Any]):
-        try:
-            return service.create(payload)
-        except ScenarioNotFound as exc:
-            raise HTTPException(status_code=404, detail="scenario not found") from exc
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(400, 'Submit runs through /api/investigation-jobs with an Idempotency-Key')
 
     return router

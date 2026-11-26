@@ -1,6 +1,8 @@
+import pytest
+pytestmark = pytest.mark.usefixtures("application_analyst")
+
 import sqlite3
 
-import pytest
 from cryptography.fernet import Fernet
 
 from poisontrace.adapters.secrets.storage import EncryptedSqliteSecrets, ManagedSecretsAdapter

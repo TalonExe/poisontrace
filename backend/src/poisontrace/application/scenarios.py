@@ -1,5 +1,7 @@
 """Application service for scenario-library use cases."""
 
+from poisontrace.application.content_policy import ContentPolicy
+
 import re
 from typing import Any
 
@@ -9,8 +11,9 @@ from poisontrace.application.ports import ScenarioRepository
 class ScenarioService:
     """Coordinates scenario CRUD and the usable-scenario execution boundary."""
 
-    def __init__(self, store: ScenarioRepository) -> None:
+    def __init__(self, store: ScenarioRepository, content_policy: ContentPolicy = ContentPolicy()) -> None:
         self.store = store
+        self.content_policy = content_policy
 
     def list(self) -> list[dict[str, Any]]:
         return self.store.list()
@@ -19,6 +22,7 @@ class ScenarioService:
         return self.store.get(scenario_id)
 
     def create(self, payload: dict[str, Any]) -> dict[str, Any]:
+        self.content_policy.require_writable()
         name = str(payload.get("name", ""))
         if not name.strip():
             raise ValueError("name is required")
@@ -41,12 +45,14 @@ class ScenarioService:
             return self.store.get(filename)
 
     def update(self, scenario_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+        self.content_policy.require_writable()
         current = self.store.get(scenario_id)
         document = dict(payload.get("document", payload))
         document["scenario_id"] = scenario_id
         return self.store.save(document, current["filename"])
 
     def delete(self, scenario_id: str) -> None:
+        self.content_policy.require_writable()
         current = self.store.get(scenario_id)
         self.store.delete_filename(current["filename"])
 

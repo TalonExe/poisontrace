@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./verification-test.js";
 
 const plan = {
   case: {
@@ -66,26 +66,88 @@ const group = {
     },
   },
 };
+
+test("durable group reconnects after an uncertain response and retains its submission intent", async ({ page }) => {
+  const record = {...group, status: "queued", attempts: [], progress: {completed:0, failed:0, interrupted:0, missing:0, queued:3, active:0}};
+  await setup(page, {record});
+  const capture = async (state) => {
+    for (const [width,height] of [[1440,1000],[390,844]]) {
+      await page.setViewportSize({width,height});
+      const layout = await page.evaluate(() => ({viewportWidth:innerWidth,viewportHeight:innerHeight,documentWidth:document.documentElement.scrollWidth,documentHeight:document.documentElement.scrollHeight}));
+      expect(layout.documentWidth).toBeLessThanOrEqual(width);
+      await page.screenshot({path:`.scratch/ticket-46-${state}-${width}-viewport.png`});
+      await page.screenshot({path:`.scratch/ticket-46-${state}-${width}-full-page.png`,fullPage:true});
+      await test.info().attach(`${state}-${width}-accessibility`, {body:await page.locator('body').ariaSnapshot(),contentType:'text/yaml'});
+      await test.info().attach(`${state}-${width}-layout`, {body:JSON.stringify(layout),contentType:'application/json'});
+    }
+  };
+  const intents = [];
+  let releaseSubmission;
+  const submission = new Promise(resolve => { releaseSubmission = resolve; });
+  await page.route("**/api/runs/investigation-cases", route => route.fulfill({json:[{case_id:"soc-auth-001",case_version:"1",name:"Synthetic incident",attacks:[{family:"cross-server-shadowing",payload_id:"soc-auth-shadow-v2"}]}]}));
+  await page.route("**/api/investigation-jobs", route => route.fulfill({json: intents.length ? [{job_id:"durable-group",group_id:"fixed-group",status:record.status === "interrupted" ? "interrupted" : "active"}] : []}));
+  await page.route("**/api/run-groups", async route => {
+    if (route.request().method() !== "POST") return route.fulfill({json:[record]});
+    intents.push(route.request().headers()["idempotency-key"]);
+    if (intents.length === 1) {
+      await submission;
+      return route.abort("failed");
+    }
+    return route.fulfill({status:202,json:{job_id:"durable-group",group_id:"fixed-group",status:"active"}});
+  });
+  await page.goto("/dashboard");
+  const launch = page.getByRole("button", {name:/^Run matched group/});
+  await expect(launch).toBeEnabled();
+  await launch.focus();
+  await page.keyboard.press("Enter");
+  try {
+    await expect(launch).toBeFocused();
+    await expect(launch).toHaveAttribute("aria-disabled", "true");
+    await expect(page.getByText(/Submitting a durable schedule/)).toBeVisible();
+    await page.keyboard.press("Enter");
+    await page.keyboard.press("Space");
+    expect(intents).toHaveLength(1);
+    await capture("submitting");
+  } finally {
+    releaseSubmission();
+  }
+  await expect(page.getByText(/The submission response is uncertain/)).toBeVisible();
+  await page.reload();
+  await expect(page.getByText(/Matched group active/)).toBeVisible();
+  await capture("active");
+  await page.getByRole("button", {name:"Retry group submission",exact:true}).click();
+  await expect(page).toHaveURL(/\/results\/groups\/fixed-group$/);
+  const notification = page.getByRole("region", {name:"Run notification"});
+  await expect(notification).toContainText("Matched group running");
+  expect(intents).toHaveLength(2);
+  expect(intents[0]).toMatch(/^[A-Za-z0-9_-]{16,128}$/);
+  expect(intents[1]).toBe(intents[0]);
+  await expect(page.getByRole("status", {name:"Group execution progress"})).toContainText("3 queued");
+  record.status = "interrupted";
+  record.progress = {completed:1,failed:0,interrupted:1,missing:1,queued:0,active:0};
+  await expect(page.getByRole("status", {name:"Group execution progress"})).toContainText("1 completed, 0 failed, 1 interrupted, 1 missing");
+  await expect(page.getByText(/No work replays automatically/)).toBeVisible();
+  await expect(notification).toContainText("Matched group interrupted");
+  await capture("interrupted");
+  await page.getByRole("button", {name:"Overview", exact:true}).click();
+  await expect(page).toHaveURL(/\/results$/);
+  await notification.getByRole("button", {name:"See the results"}).click();
+  await expect(page).toHaveURL(/\/results\/groups\/fixed-group$/);
+  await expect(notification).toHaveCount(0);
+});
 async function setup(
   page,
-  { error = false, empty = false, record = group } = {},
+  { record = group } = {},
 ) {
   await page.route(
     (url) => url.pathname.startsWith("/api/"),
     async (route) => {
       const path = new URL(route.request().url()).pathname;
-      if (error && path.startsWith("/api/run-groups"))
-        return route.fulfill({
-          status: 503,
-          json: { detail: "Groups unavailable. Retry loading." },
-        });
       const body =
         path === "/api/auth/session"
           ? { user: { username: "researcher", role: "analyst" } }
           : path === "/api/run-groups"
-            ? empty
-              ? []
-              : [record]
+            ? [record]
             : path === "/api/run-groups/fixed-group"
               ? record
               : [];
@@ -93,6 +155,63 @@ async function setup(
     },
   );
 }
+test("condition cards filter retained attempts and open the exact saved trace", async ({ page }) => {
+  await setup(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  const run = { run_id: 4, id: "EXP-004", status: "failed", trace: [] };
+  await page.route("**/api/runs", (route) => route.fulfill({ json: [run] }));
+  await page.route("**/api/runs/4", (route) => route.fulfill({ json: run }));
+  await page.goto("/results/groups/fixed-group");
+  const retained = page.getByRole("region", { name: "Retained attempts" });
+  await page.getByRole("button", { name: /^poisoned/i }).click();
+  await expect(retained.getByText("No retained attempts for this selection.")).toBeVisible();
+  await page.getByRole("button", { name: /^clean/i }).click();
+  const traceLink = retained.getByRole("link", { name: "View trace · Attempt 1 · EXP-004" });
+  await expect(traceLink).toBeVisible();
+  await retained.getByRole("button", { name: "Show all attempts" }).focus();
+  await page.keyboard.press("Tab");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await page.keyboard.press("ArrowRight");
+  await expect(traceLink).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/results\/runs\/4$/);
+  await expect(page.getByText("No persisted trace events.")).toBeVisible();
+  await page.getByRole("button", { name: "Back to group" }).click();
+  await expect(page).toHaveURL(/\/results\/groups\/fixed-group$/);
+  await expect(page.getByRole("button", { name: /^clean/i })).toHaveAttribute("aria-pressed", "true");
+});
+
+test("retained attempts page and sort on mobile and link to the exact trace", async ({ page }) => {
+  const attempts = Array.from({ length: 11 }, (_, index) => ({
+    attempt: index + 1,
+    repeat: 1,
+    condition: "clean",
+    status: index === 10 ? "interrupted" : "failed",
+    run_id: index === 10 ? null : index + 4,
+  }));
+  await setup(page, { record: { ...group, attempts } });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/results/groups/fixed-group");
+  const retained = page.getByRole("region", { name: "Retained attempts" });
+  const grid = retained.getByRole("grid", { name: "Retained attempts" });
+  await expect(retained.getByRole("status")).toHaveText("1–10 of 11 attempts");
+  await retained.getByRole("button", { name: "Next page" }).press("Enter");
+  await expect(retained.getByRole("status")).toHaveText("11–11 of 11 attempts");
+  await expect(grid.getByRole("row").nth(1)).toContainText("interrupted");
+  await expect(grid.getByRole("row").nth(1)).toContainText("Trace unavailable");
+  await grid.getByRole("columnheader", { name: "Attempt" }).press("Enter");
+  await expect(grid.getByRole("columnheader", { name: "Attempt" })).toHaveAttribute("aria-sort", "descending");
+  await expect(retained.getByRole("status")).toHaveText("1–10 of 11 attempts");
+  await expect(grid.getByRole("row").nth(1)).toContainText("interrupted");
+  await expect(grid.getByRole("link", { name: "View trace · Attempt 10 · EXP-013" })).toHaveAttribute("href", "/results/runs/13");
+  expect(await page.locator("html").evaluate((element) => element.scrollWidth)).toBeLessThanOrEqual(390);
+  await test.info().attach("retained-attempts-accessibility", {body: await retained.ariaSnapshot(), contentType: "text/yaml"});
+  await page.screenshot({path: test.info().outputPath("retained-attempts-mobile.png"), fullPage: true});
+  await page.setViewportSize({width: 1440, height: 1000});
+  await page.screenshot({path: test.info().outputPath("retained-attempts-desktop.png"), fullPage: true});
+});
+
 test("group Results distinguishes failure, missing and incompatible attempts", async ({
   page,
 }) => {
@@ -109,29 +228,25 @@ test("group Results distinguishes failure, missing and incompatible attempts", a
   await expect(
     page.getByText("Attempt 2: payload version or snapshot"),
   ).toBeVisible();
-  await expect(page.getByText(/Repeat 1 · clean · failed/)).toContainText(
+  await expect(page.getByRole("row").filter({ hasText: "Repeat 1 · clean" })).toContainText(
     "investigation_time_limit",
   );
   await expect(
     page.getByRole("region", { name: "Condition comparison" }),
   ).toContainText("Unavailable · 0 eligible");
 });
-test("group history has an empty state", async ({ page }) => {
-  await setup(page, { empty: true });
-  await page.goto("/results/groups");
-  await expect(
-    page.getByText("No matched groups yet. Configure one on Experiment."),
-  ).toBeVisible();
-});
-test("group loading errors support retry", async ({ page }) => {
-  await setup(page, { error: true });
+test("retry loads saved groups after a temporary request failure", async ({ page }) => {
+  await setup(page);
+  await page.route("**/api/run-groups", (route) => route.fulfill({
+    status: 503,
+    json: { detail: "Groups unavailable. Retry loading." },
+  }), { times: 1 });
   await page.goto("/results/groups");
   await expect(page.getByRole("alert")).toContainText(
     "Groups unavailable. Retry loading.",
   );
-  await expect(
-    page.getByRole("button", { name: "Retry groups", exact: true }),
-  ).toBeVisible();
+  await page.getByRole("button", { name: "Retry groups", exact: true }).click();
+  await expect(page.getByRole("button", { name: /Synthetic incident/ })).toBeVisible();
 });
 
 test("matched comparison colors correctness and attacker outcomes in opposite directions", async ({
@@ -364,7 +479,7 @@ for (const [name, correct, scored, completed, failed, expected] of [
       page.getByText("Attempt 2: payload version or snapshot"),
     ).toBeVisible();
     await expect(
-      page.getByRole("link", { name: "Inspect attempt 1 · EXP-004" }),
+      page.getByRole("link", { name: "View trace · Attempt 1 · EXP-004" }),
     ).toBeVisible();
     if (name === "partial unscored retained rerun") {
       await expect(overall).toContainText("1 completed but unscored");
@@ -397,5 +512,5 @@ test('comparison leads decisions and separates observations from execution accou
   }
   await expect(page.getByRole('region',{name:'Execution accounting',exact:true})).toContainText('Mean duration, compatible attempts');
   await expect(page.getByRole('region',{name:'Execution accounting',exact:true})).toContainText('System error, all saved attempts');
-  await expect(page.getByRole('link',{name:'Inspect attempt 1 · EXP-004'})).toBeVisible();
+  await expect(page.getByRole('link',{name:'View trace · Attempt 1 · EXP-004'})).toBeVisible();
 });

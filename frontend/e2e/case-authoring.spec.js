@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./verification-test.js";
 
 test("routine setup separates MCP authoring and returns with the current version", async ({
   page,
@@ -206,7 +206,7 @@ test("single setup notices an externally edited version before execution", async
             attacks: [],
           },
         ];
-      if (path === "/api/runs" && route.request().method() === "POST") {
+      if (path === "/api/investigation-jobs" && route.request().method() === "POST") {
         executions++;
         return route.fulfill({
           status: 400,

@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { workspaceStorage } from "../../utils/workspaceStorage";
 import { loadSessions } from "../../utils/sessions";
 import {
   executionModels,
@@ -6,8 +7,9 @@ import {
 } from "../../utils/executionSelection";
 
 export function useExecutionOptions(runner) {
+  const storage = useMemo(() => workspaceStorage(window.localStorage), []);
   const [configurations, setConfigurations] = useState(() =>
-    loadSessions(window.localStorage),
+    loadSessions(storage),
   );
   const [credentials, setCredentials] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,7 +17,7 @@ export function useExecutionOptions(runner) {
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     let active = true;
-    setConfigurations(loadSessions(window.localStorage));
+    setConfigurations(loadSessions(storage));
     setCredentials([]);
     setLoading(true);
     setError("");
@@ -125,9 +127,6 @@ export function ExecutionSelection({
         >
           Reload execution options
         </button>
-        <a href="/sessions" target="_blank" rel="noreferrer">
-          Manage configurations and credentials (opens a new tab)
-        </a>
       </div>
     </section>
   );

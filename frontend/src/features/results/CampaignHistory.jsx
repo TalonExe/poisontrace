@@ -1,7 +1,9 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CardHead } from "../../components/common/Ui";
 import { outcomePresentation } from "../../utils/outcomePresentation";
 import { MeasurementSummary } from "../dashboard/MeasurementSummary";
+import { observeInvestigationJobs } from "../dashboard/investigationJobObserver";
+import { workspaceStorage } from "../../utils/workspaceStorage";
 
 export function CampaignHistory({
   campaigns,
@@ -19,6 +21,41 @@ export function CampaignHistory({
   const [attempt, setAttempt] = useState(0);
   const [rerunning, setRerunning] = useState("");
   const [rerunError, setRerunError] = useState("");
+  const storage = useMemo(() => workspaceStorage(window.localStorage), []);
+  const storageKey = `campaign-rerun-${campaignId}`;
+  const [pending, setPending] = useState(null);
+  const campaignScope = useRef(null);
+  useEffect(() => {
+    const scope = {};
+    campaignScope.current = scope;
+    let saved;
+    try { saved = JSON.parse(storage.getItem(storageKey) || "null"); }
+    catch { saved = null; }
+    setPending(saved);
+    setRerunning(saved?.jobId ? `${campaignId}:${saved.ordinal}` : "");
+    return () => { campaignScope.current = null; };
+  }, [storage, storageKey, campaignId]);
+  useEffect(() => {
+    if (!pending?.jobId || pending.campaignId !== campaignId) return;
+    const scope = campaignScope.current;
+    return observeInvestigationJobs({
+      runner,
+      jobId: pending.jobId,
+      onUpdate: ({ job, busy }) => {
+        if (busy) return;
+        storage.setItem(storageKey, "null");
+        setPending(null);
+        setRerunning("");
+        if (job.status === "interrupted") setRerunError("The provider outcome is uncertain. The rerun will not replay automatically.");
+        runner.getCampaign(campaignId).then((campaign) => {
+          if (campaignScope.current === scope) setSelectedCampaign(campaign);
+        }).catch((error) => {
+          if (campaignScope.current === scope) setRerunError(error.message);
+        });
+      },
+      onError: (error) => setRerunError(error.message),
+    });
+  }, [runner, campaignId, pending, storage, storageKey]);
   useEffect(() => {
     let active = true;
     setSelectedCampaign(null);
@@ -44,14 +81,30 @@ export function CampaignHistory({
   }, [runner, campaignId, attempt]);
   const selectedScenario = selectedCampaign?.scenarios?.[selectedScenarioIndex];
   const rerun = async (id, ordinal) => {
+    const scope = campaignScope.current;
     setRerunning(`${id}:${ordinal}`);
     setRerunError("");
-    try {
-      setSelectedCampaign(await runner.rerunCampaignScenario(id, ordinal));
-    } catch (error) {
-      setRerunError(error.message);
-    } finally {
+    const same = pending?.campaignId === id && pending.ordinal === ordinal;
+    if (pending && !same) {
+      setRerunError("Retry the pending scenario before starting another rerun.");
       setRerunning("");
+      return;
+    }
+    const submission = { campaignId: id, ordinal, intent: pending?.intent || crypto.randomUUID() };
+    const save = (value) => {
+      storage.setItem(storageKey, JSON.stringify(value));
+      if (campaignScope.current === scope) setPending(value);
+    };
+    save(submission);
+    try {
+      const job = await runner.rerunCampaignScenario(id, ordinal, submission.intent);
+      save({ ...submission, jobId: job.job_id });
+    } catch (error) {
+      if ([400, 404, 409, 422].includes(error.status)) save(null);
+      if (campaignScope.current === scope) {
+        setRerunError(error.message);
+        setRerunning("");
+      }
     }
   };
   return (

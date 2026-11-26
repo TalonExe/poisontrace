@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./verification-test.js";
 
 test("analyst selects matched conditions and inspects recorded definitions", async ({
   page,
@@ -20,7 +20,7 @@ test("analyst selects matched conditions and inspects recorded definitions", asy
         };
       if (path === "/api/scenarios")
         data = [{ scenario_id: "002", name: "Synthetic case", valid: true }];
-      if (path === "/api/runs" && route.request().method() === "POST") {
+      if (path === "/api/investigation-jobs" && route.request().method() === "POST") {
         const request = route.request().postDataJSON();
         const description =
           request.mode.toLowerCase() === "clean"
@@ -50,7 +50,7 @@ test("analyst selects matched conditions and inspects recorded definitions", asy
             },
           ],
         };
-        data = saved;
+        data = { job_id: `metadata-${nextId}`, status: "completed", run_id: saved.run_id };
       }
       if (path === "/api/runs/summary") data = rateSummary;
       else if (path.startsWith("/api/runs/")) data = saved;
@@ -81,8 +81,7 @@ test("analyst selects matched conditions and inspects recorded definitions", asy
         ? "Rejected proposed call: tool_definition_mismatch"
         : "simulated permission allowed",
     );
-    await page.locator(".workspace-navigation summary").click();
-    await page.getByRole("button", { name: "Metadata experiments", exact: true }).click();
+    await page.goto("/dashboard/metadata");
   }
 });
 
